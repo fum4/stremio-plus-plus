@@ -64,6 +64,7 @@ So with cache > 0 the server already downloads the whole file; the only things s
 - The subtitles request carries `filename`, `videoSize`, `videoHash` (OpenSubtitles hash) — **no infoHash**. We match against the server's `/stats.json` (active engines → files → name/size), then read `localhost:11470/{ih}/{idx}`.
 
 ## The TV side
-- Stremio publishes `tizen/server.js` builds → the official TV app most likely runs an **on-TV server** (tiny cache). Pointing the TV at Batman replaces it; Batman asleep ⇒ no torrent playback until reverted.
+- **Confirmed 2026-10-21:** the TV's server URL is `http://127.0.0.1:11470`, server **v4.20.8** — an **on-TV server** (the published `tizen/server.js` build). That's the likely cause of today's pause stalls. Pointing the TV at Batman replaces it; Batman asleep ⇒ no torrent playback until reverted.
+- **The TV app is "Stremio Theater v1.12.1" (platform tizen 5.5), not stremio-web.** No public repo under the Stremio org matches "theater" (checked 2026-10-21) → closed source. Consequences: (1) the stremio-video `subtitles.vtt?from=` rewrite and the once-per-load subtitle request were researched in stremio-web/stremio-video/stremio-core and may not hold for Theater — phase 0 must test them on the TV; (2) a `stremio-web` fork would **replace** the official app with a different one, not patch it.
 - A stock stremio-web build on Tizen falls back to HTMLVideo: platform `tizen` vs `'Tizen'` in `src/common/Platform/device.ts:31-33`, and `index.html` doesn't load `$WEBAPIS/webapis/webapis.js`. Only relevant if we fork (deferred).
 - stremio-web: GPL-2.0, ~5 commits/day. enginefs: public, **no LICENSE file**.

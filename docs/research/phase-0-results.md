@@ -29,6 +29,7 @@ Torrent: Ubuntu 26.10 desktop ISO (6.6 GB, legal, well seeded), `/{ih}/0`, scrip
 | TV shows subtitles from a hand-served plain-http addon on the LAN | _pending_ |
 | Revert to the TV's own server is one setting | _pending_ |
 | Batman sleeps mid-film → what the TV shows | _pending_ |
+| DTS-audio file plays (server transcodes audio?) · DV file colours | _pending_ |
 
 ## Benchmarks (M4 Pro, 10 min of real movie audio)
 | Bench | Result |
