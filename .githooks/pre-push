@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Mac stand-in for the devbox global pre-push hook (devbox docs/ci.md, docs/git-guards.md):
+# refuse pushes to stable branches, then run the repo's `pre-push` task.
+set -euo pipefail
+zero=0000000000000000000000000000000000000000
+while read -r _local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main|refs/heads/master|refs/heads/develop|refs/heads/staging)
+      echo "pre-push: refusing direct push to ${remote_ref#refs/heads/} — open a PR" >&2
+      exit 1 ;;
+  esac
+  [ "$local_sha" = "$zero" ] && continue  # branch deletion
+  export PRE_PUSH_HEAD="$local_sha"
+  if [ "$remote_sha" = "$zero" ]; then export PRE_PUSH_BASE=""; else export PRE_PUSH_BASE="$remote_sha"; fi
+  mise run pre-push
+done
