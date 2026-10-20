@@ -28,7 +28,14 @@ We set our own `APP_PATH` (`~/Library/Application Support/stremio-companion/stre
 | `cacheSize == 0` (or `--noCache`) → 15 MB buffer + **45 MB in-memory circular buffer** + `swarmCap.maxBuffer .75` — the mode that stops downloading while paused | `server.js:48184` |
 | Every engine creation trims the cache dir to `cacheSize` (`cache.clearCache(..., settings.cacheSize, 0)`) → a finite cache can evict a file we are still processing | `server.js:48110` |
 
-→ cache **Infinite**. How the UI encodes "Infinite" in `server-settings.json` (null? a huge number?) is a phase-0 check.
+**"Infinite" = `cacheSize: null`** — the UI's options are `[0, 2 GiB, 5 GiB, 10 GiB, null]` (stremio-web `src/routes/Settings/Streaming/useStreamingOptions.ts:9`; the server's own `/settings` `options` say the same, `∞ → null`). JSON can't hold `Infinity`, so it is stored as `null`.
+
+**What `null` actually does** (`clearCache`, `server.js:36236-36266`): the early return is `toSize == 1/0`, which `null` fails; then `Math.min(null, …)` coerces to `0`, so **every engine creation deletes every cached file of every *inactive* engine**. Files of engines still in `enginefs.list()` are skipped (`omit`). So "∞" really means "keep only what's active, clean the rest on the next engine creation" — no re-watch cache, but no disk fill either.
+
+→ For us: cache = `null`. The file we're processing stays safe **as long as its engine is alive** — the engine pin is what guarantees that. A huge finite value would instead keep everything until the disk is full (`toSize` is capped at `used + free`).
+
+## Torrent profiles
+stremio-web `useStreamingOptions.ts:30-61`: default (hard 3.5 MiB/s, 55 conns), soft, fast (hard 37.5 MiB/s, 200 conns), **ultra fast** (hard 75 MiB/s, soft 8 MiB/s, 400 conns, 25 s handshake, 6 s request timeout). We apply ultra fast + `cacheSize: null` from `infra/stremio-server/settings.json` via `POST /settings` (`mise run server:configure`; re-applied on every `install-service`). `POST /settings` merges and persists to `$APP_PATH/server-settings.json`; verified surviving a restart.
 
 ## Engine lifecycle
 | Fact | Evidence |

@@ -1,7 +1,7 @@
 # Backlog
 
-## Cache cleanup policy for an Infinite cache · 2026-10-21 · M
-Infinite cache never trims; Batman's disk will fill. Deferred until phase 1 shows real usage. First step: measure cache growth per film; then an age/LRU sweep of our own `APP_PATH` cache dir that skips files of active engines.
+## Pin lifetime vs cache cleanup · 2026-10-21 · S
+With `cacheSize: null` the server deletes inactive engines' files on every engine creation (stremio-internals § Cache). The pin must therefore outlive processing (sync/generate done), not just the pause. First step: in phase 1, release a pin only when the file is fully downloaded **and** no job holds it.
 
 ## Linux (systemd) templates for the always-on box · 2026-10-21 · S
 `launchd/` only today. When the move to a Mac mini / N100 is decided: add `systemd/` units mirroring the plists and branch `install-service` on `uname`.
