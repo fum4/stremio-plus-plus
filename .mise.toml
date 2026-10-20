@@ -7,6 +7,8 @@ uv = "0.13.4"
 node = "24.22.0"
 
 [env]
+# macOS has no tmpfs (/dev/shm); repo-secrets `edit` falls back to the per-user, 0700, disk-backed $TMPDIR.
+XDG_RUNTIME_DIR = "{{ get_env(name='XDG_RUNTIME_DIR', default=get_env(name='TMPDIR', default='/tmp')) }}"
 _.python.venv = { path = ".venv", create = true }
 # Committed, non-secret config; `.env.local` holds per-machine overrides (gitignored).
 _.file = ["infra/env/companion.env", "infra/env/stremio-server.env", ".env.local"]
@@ -17,6 +19,7 @@ run = [
   "brew bundle --file=Brewfile --quiet",
   "uv sync --frozen",
   "git config core.hooksPath .githooks",
+  "scripts/install-repo-secrets.sh",
 ]
 
 [tasks."server:fetch"]
@@ -35,6 +38,35 @@ run = "scripts/launchd-install.sh"
 [tasks.uninstall-service]
 description = "Unload and remove the launchd agents (args: server companion; default all)"
 run = "scripts/launchd-uninstall.sh"
+
+[tasks."tools:repo-secrets"]
+description = "Install the pinned devbox repo-secrets engine into ~/.local/bin"
+run = "scripts/install-repo-secrets.sh"
+
+# ── Secrets (repo-secrets engine; devbox docs/repo-secrets.md) ─────────────
+[tasks."secrets:decrypt"]
+description = "Materialize file/sshkey secrets, then render the generated env files (with <age>s: only those rows)"
+run = "repo-secrets decrypt"
+
+[tasks."secrets:clean"]
+description = "Remove materialized plaintext a .age restores (--render: also the generated env files; --all: also ~/.ssh keys)"
+run = "repo-secrets clean"
+
+[tasks."secrets:encrypt"]
+description = "Re-encrypt file/sshkey secrets from their plaintext (unchanged ones left alone)"
+run = "repo-secrets encrypt"
+
+[tasks."secrets:render"]
+description = "Regenerate every render-row env file from committed config + secrets"
+run = "repo-secrets render"
+
+[tasks."secrets:edit"]
+description = "Edit one secret in a tmpfs copy, re-encrypt, re-render (mise run secrets:edit <age>)"
+run = "repo-secrets edit"
+
+[tasks."secrets:check"]
+description = "Every manifest row has its sources (exit 1 otherwise)"
+run = "repo-secrets check"
 
 [tasks.dev]
 description = "Run the companion in the foreground with reload"
