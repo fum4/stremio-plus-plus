@@ -55,6 +55,9 @@ stremio-web `useStreamingOptions.ts:30-61`: default (hard 3.5 MiB/s, 55 conns), 
 
 So with cache > 0 the server already downloads the whole file; the only things stopping it are the engine dying (pin) and the speed cap (profile).
 
+## Remote HTTPS (`remoteHttps`)
+Setting `remoteHttps` to a LAN IP makes the server fetch a cert via `GET /get-https?ipAddress=<ip>` (`server.js:48041`, `https.newCertificate`) and serve HTTPS on **:12470** for `<ip-with-dashes>.519b6502d940.stremio.rocks`, a public DNS name resolving to that private IP (Let's Encrypt wildcard). This is how a non-localhost client (the TV app) can use a LAN server. The server **logs the client's `authKey` in plain text** on `/get-https` requests (server.log).
+
 ## Endpoints
 `/{ih}/create`, `/{ih}/{idx}`, `/{ih}/{idx}/stats.json`, `/stats.json`, `/opensubHash?videoUrl=`, `/subtitles.:ext?from=&offset=`, `/subtitlesTracks`, `/tracks/:url`, `/hlsv2/probe`, `POST /settings`.
 

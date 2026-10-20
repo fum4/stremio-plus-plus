@@ -8,3 +8,6 @@ With `cacheSize: null` the server deletes inactive engines' files on every engin
 
 ## Converge the Mac gate with `wt` · 2026-10-21 · S
 `.githooks/pre-push` and `scripts/pre-merge-gate.sh` are Mac stand-ins for the devbox global hooks + `wt pre-merge`. If `wt`/the hooks become installable on macOS, delete these and use them.
+
+## Server log holds the Stremio authKey in plain text · 2026-10-21 · S
+server.js logs `GET /get-https?authKey=…` to `~/Library/Logs/stremio-companion/server.log`. First step: create the log dir 0700 / file 0600 in `launchd-install.sh`, and add rotation (newsyslog conf in the repo) so it doesn't grow forever.

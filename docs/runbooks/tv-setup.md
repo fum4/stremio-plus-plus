@@ -18,8 +18,13 @@ On the router (`http://192.168.1.1`): DHCP / LAN settings → address reservatio
 ## 2. Start the server on Batman
 `mise run install-service` (see README). Check: `curl -s http://<batman-ip>:11470/stats.json` from another device on the LAN.
 
-## 3. Point the TV at Batman
-In the Stremio TV app: **Settings → Streaming → Streaming server URL** → write down the current value in the table above → set `http://<batman-ip>:11470` → confirm the app shows the server as online. _Exact menu labels: confirm in phase 0 and fix here._
+## 3. Point the TV at Batman — HTTPS only
+The TV app (Stremio Theater) **refuses plain http to anything but `127.0.0.1`**: `http://<batman-ip>:11470` shows "offline" and never reaches Batman. Use the server's HTTPS endpoint instead:
+
+1. `.env.local` has `STREMIO_REMOTE_HTTPS_IP=<batman-ip>`; `mise run server:configure` prints the TV URL, e.g. `https://192-168-1-132.519b6502d940.stremio.rocks:12470` (public DNS name → LAN IP, cert issued by Stremio's API).
+2. TV: **Settings → Streaming → server URL** → that https URL → shows online.
+
+The hostname embeds the IP → the DHCP reservation (§1) is mandatory; a new IP means re-running `server:configure` and re-entering the URL on the TV. Needs internet DNS (a router with DNS-rebind protection that blocks public names resolving to private IPs would break it — works on this router, verified 2026-10-21).
 
 ## 4. Revert (Batman asleep, away, or broken)
 Settings → Streaming → server URL → the original value from the table. _Confirm in phase 0 that this is the only step._
