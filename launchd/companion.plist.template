@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- stremio-companion (FastAPI). Becomes long-running in phase 1; until then it boots and exits. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>io.github.fum4.stremio-companion.companion</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>@MISE@</string><string>exec</string><string>--cd</string><string>@REPO@</string>
+    <string>--</string><string>python</string><string>-m</string><string>stremio_companion</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <!-- Restart on crash only; a clean exit stays down. -->
+  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>StandardOutPath</key><string>@HOME@/Library/Logs/stremio-companion/companion.log</string>
+  <key>StandardErrorPath</key><string>@HOME@/Library/Logs/stremio-companion/companion.log</string>
+</dict>
+</plist>
