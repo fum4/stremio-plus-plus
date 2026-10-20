@@ -1,0 +1,69 @@
+# Toolchain + operator tasks (Tier 3, devbox docs/dev-contract.md).
+# System deps that mise can't pin (ffmpeg, age, bash 5) live in the Brewfile.
+
+[tools]
+python = "3.14.8"
+uv = "0.13.4"
+node = "24.22.0"
+
+[env]
+_.python.venv = { path = ".venv", create = true }
+# Committed, non-secret config; `.env.local` holds per-machine overrides (gitignored).
+_.file = ["infra/env/companion.env", "infra/env/stremio-server.env", ".env.local"]
+
+[tasks.setup]
+description = "Lightweight, secret-free, idempotent install: Brewfile deps, venv, git hooks"
+run = [
+  "brew bundle --file=Brewfile --quiet",
+  "uv sync --frozen",
+  "git config core.hooksPath .githooks",
+]
+
+[tasks."server:fetch"]
+description = "Download the pinned streaming server.js into var/ and verify its sha256"
+run = "scripts/stremio-server-fetch.sh"
+
+[tasks.install-service]
+description = "Render launchd/*.plist.template into ~/Library/LaunchAgents and (re)load them (args: server companion; default all)"
+depends = ["server:fetch"]
+run = "scripts/launchd-install.sh"
+
+[tasks.uninstall-service]
+description = "Unload and remove the launchd agents (args: server companion; default all)"
+run = "scripts/launchd-uninstall.sh"
+
+[tasks.dev]
+description = "Run the companion in the foreground with reload"
+run = "uv run python -m stremio_companion"
+
+[tasks.format]
+description = "Format the code (writes)"
+run = "uv run ruff format ."
+
+[tasks."format:check"]
+description = "Check formatting (no writes)"
+run = "uv run ruff format --check ."
+
+[tasks.lint]
+description = "Ruff lint"
+run = "uv run ruff check ."
+
+[tasks.typecheck]
+description = "Pyright strict"
+run = "uv run pyright"
+
+[tasks.test]
+description = "Unit tests (hermetic)"
+run = "uv run pytest"
+
+[tasks.pre-push]
+description = "Static checks: format, lint, typecheck (no tests)"
+depends = ["format:check", "lint", "typecheck"]
+
+[tasks.pre-merge]
+description = "Unit tests"
+depends = ["test"]
+
+[tasks.gate]
+description = "Run pre-merge on the current PR head and post the devbox/pre-merge status (Mac stand-in for wt pre-merge)"
+run = "scripts/pre-merge-gate.sh"
