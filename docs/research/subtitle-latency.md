@@ -21,11 +21,14 @@ Model: **T(L) ≈ a + r·L** with a fixed cost **a ≈ 8 s** (Whisper start + on
 The player fetches the SRT once per track selection (see [plan.md](../plan.md) risks), so two things matter: what is ready when that fetch is answered, and staying ahead of the viewer afterwards.
 
 - **Staying ahead.** A window has to finish before the viewer reaches it. With `lead` seconds covered ahead of the playhead, the next window can be at most **L ≤ (lead − a) / r**. The lead after it grows by (1 − r)·L − a, so lengths only grow if the first window is longer than **a / (1 − r) ≈ 11 s**. A 10 s first step looks attractive but never builds a lead: each next window would be shorter.
-- **First window: 15 s.** Ready ~10 s after the request (measured end to end, cold: 10.0–11.0 s), under the 20 s the SRT request now waits (`FIRST_ANSWER_WAIT_S`), and long enough to grow.
+- **First window: 15 s.** Ready ~10 s after generation starts (measured end to end with a warm model: 10.0–11.0 s; 20.5 s with a cold one, hence the warm-up at startup) and long enough to grow. Generation starts when the episode loads (stremio-core asks the addon for subtitles then), so it's usually ready by the time the track is selected; the SRT request waits up to 7 s more (`FIRST_ANSWER_WAIT_S`), capped by server.js's ~10 s fetch timeout below.
 - **Aim it ahead.** It starts where the viewer will be when it's done (playhead + a + r·15 ≈ 12.5 s), not at the playhead: lines for the seconds spent generating would arrive already in the past. Those seconds are back-filled once everything ahead is covered.
 - **Growth.** With the viewer watching: 15 → 23 → 51 → 120 s, then 120 s windows (`MAX_WINDOW_S`, long enough for Whisper's context and few Claude calls: ~30/hour while watching, well under the hourly cap). Paused at a fresh selection: 15 → 65 → 120 s.
 
 End to end on real audio and models (paused at 0 s): 12.5–27.5 s ready at 10.0 s, 27.5–92.5 s at 29.8 s, 92.5–212.5 s at 70.4 s.
+
+## The 10 s ceiling on the first answer
+The TV doesn't fetch our SRT itself: it asks the streaming server for `/subtitles.vtt?from=<srt url>` (server.js:47898), which fetches and converts it. Measured against the pinned server with a local SRT that answers after a delay: 3–9 s → 200; 11, 15, 21, 30 s → 500 at ~10.2 s. A 500 is what the TV shows as "failed to load external subtitles", worse than the placeholder (which at least says to re-select). So the wait stays at 7 s.
 
 ## Not done
 - Shorter Whisper windows lose context at the edges; the 2 s overlap (`OVERLAP_S`) and keeping only cues that start inside the window handle it, but the first 15 s window is the least accurate one. Not measured (WER per window size).

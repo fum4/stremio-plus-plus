@@ -20,6 +20,7 @@ class FakeServer:
         self.stats = stats
         self.progress = progress
         self.streams: list[str] = []
+        self.busy: set[tuple[str, int]] = set()  # stats.json for these times out
         self.http = httpx.AsyncClient(transport=httpx.MockTransport(self._handle))
         self.client = StremioServer("http://srv", self.http)
 
@@ -29,6 +30,8 @@ class FakeServer:
             return httpx.Response(200, json=self.stats)
         if len(parts) == 3 and parts[2] == "stats.json":
             key = (parts[0], int(parts[1]))
+            if key in self.busy:
+                raise httpx.ReadTimeout("server busy", request=req)
             return httpx.Response(200, json={"streamProgress": self.progress.get(key, 0.0)})
         self.streams.append(req.url.path)
         return httpx.Response(206, stream=_Idle())
