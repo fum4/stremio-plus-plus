@@ -31,7 +31,8 @@ Everything the host needs is in this repo; per-machine state is three things: `.
 9. **Addon:** nothing to do: the URL (`mise run addon:url`) is the same on every host.
 
 ## On the old Mac
-10. Already done in step 5 if you copied the history; otherwise `mise run host:demote` (stops server, companion, cleanup).
+10. Already done in step 5 if you copied the history; otherwise `mise run host:demote` (stops server, companion, cleanup, certificate renewal). Optional: delete `~/Library/Application Support/stremio-companion/` to reclaim the cache.
+11. Optional: on the TV, revoke the old host's pairing (TV Settings → General → External Device Manager → Device Connection Manager → Device List).
 
 ## Revert
 TV server URL → `http://127.0.0.1:11470` (the TV's own server) — playback works with no Mac at all ([tv-setup.md](tv-setup.md)).
