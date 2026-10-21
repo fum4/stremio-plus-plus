@@ -12,6 +12,7 @@ VALID = {
     "COMPANION_PORT": "11471",
     "COMPANION_DATA_DIR": "/tmp/companion-data",
     "HOST_LAN_IP": "192.168.1.132",
+    "CLAUDE_CLI": "~/.local/bin/claude",
     "LOG_LEVEL": "INFO",
     "LOG_FORMAT": "json",
 }
