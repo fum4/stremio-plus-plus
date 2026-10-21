@@ -50,6 +50,14 @@ class Env(BaseSettings):
     log_format: LogFormat
 
     @field_validator(
+        "host_lan_ip", "tv_host", "tv_os", "addon_domain", "addon_token", mode="before"
+    )
+    @classmethod
+    def _empty_is_unset(cls, value: object) -> object:
+        """`KEY=` in .env.local means "deliberately not set" (with-secrets.sh needs it set)."""
+        return None if value == "" else value
+
+    @field_validator(
         "stremio_server_log",
         "stremio_server_data_dir",
         "companion_data_dir",

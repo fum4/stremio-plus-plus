@@ -70,6 +70,17 @@ def test_a_fresh_install_needs_none_of_the_personal_values(env: pytest.MonkeyPat
     )
 
 
+def test_an_empty_optional_value_means_unset(env: pytest.MonkeyPatch) -> None:
+    _set_all(env, ADDON_DOMAIN="", TV_HOST="", TV_OS="", ADDON_TOKEN="")
+    loaded = load_env()
+    assert (loaded.addon_domain, loaded.tv_host, loaded.tv_os, loaded.addon_token) == (
+        None,
+        None,
+        None,
+        None,
+    )
+
+
 @pytest.mark.parametrize("missing", sorted(REQUIRED))
 def test_fails_on_any_missing_required_value(env: pytest.MonkeyPatch, missing: str) -> None:
     for key, value in VALID.items():

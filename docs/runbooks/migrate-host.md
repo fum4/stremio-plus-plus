@@ -23,7 +23,7 @@ Everything the host needs is in this repo; per-machine state is four things: `.e
    TV_HOST=192.168.1.134
    TV_OS=samsung
    ```
-   The last three are the owner's personal setup (own addon domain, TV control); without them the host runs the zero-config path (the addon under the server's stremio.rocks certificate, a generated token), which would change the installed addon URL. (Only if Claude Code lives elsewhere: `CLAUDE_CLI=<path>`.)
+   The last three are the owner's personal setup (own addon domain, TV control); without them the host runs the zero-config path (the addon under the server's stremio.rocks certificate, a generated token), which would change the installed addon URL; to choose that on purpose, set `ADDON_DOMAIN=` (empty) instead. (Only if Claude Code lives elsewhere: `CLAUDE_CLI=<path>`.)
 5. **Bring over the history (optional but recommended)** — demote the old Mac first (`mise run host:demote`), then copy
    `~/Library/Application Support/stremio-plus-plus/companion/state.db*` from old → same path on the new Mac. Generated subtitles come with it; the torrent cache doesn't need to (it re-downloads).
    Copy `~/.config/stremio-plus-plus/` too (keep `secrets.toml` at mode 600); without it the new host starts on the defaults.
