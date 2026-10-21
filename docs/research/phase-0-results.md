@@ -25,11 +25,15 @@ Torrent: Ubuntu 26.10 desktop ISO (6.6 GB, legal, well seeded), `/{ih}/0`, scrip
 | TV app has a streaming-server URL setting | ✅ Settings → Streaming → server URL |
 | `http://192.168.1.132:11470` on the TV | ❌ "offline" — **zero requests reached Batman**. Batman ↔ TV reachable both ways (TV API on :8001 answered; launchd-run node reaches the TV, so not macOS Local Network Privacy) → Theater refuses plain http to non-localhost (mixed-content rule; `http://127.0.0.1` is exempt) |
 | `https://192-168-1-132.519b6502d940.stremio.rocks:12470` (server `remoteHttps`) | ✅ **online** — TV (192.168.1.134) connected to :12470 and called `/get-https`. Public DNS → 192.168.1.132; Let's Encrypt `*.519b6502d940.stremio.rocks`, valid to 2026-12-24 |
-| Playback through Batman | _pending_ |
-| `/{ih}/{idx}/stats.json` bytes keep rising during a 2+ min pause — **without** pin | _pending_ |
-| …same — **with** a manual pin (curl Range read) | _pending_ |
-| Does the TV close its HTTP connection on pause? (`lsof` / server log) | _pending_ |
-| TV shows subtitles from a hand-served plain-http addon on the LAN | _pending_ — expected ❌ given the above; fallback: own-domain HTTPS |
+| Playback through Batman | ✅ MobLand S01E01→E02 (4K HEVC 10-bit, DDP 5.1, season pack) plays; subtitles from strem.io fetched by Batman via `/subtitles.vtt?from=` |
+| Download keeps rising during a 2+ min pause — **without** pin | ✅ paused ~01:57–02:01: E02 went 7 % → 26 %+ (~1 GB), speed rose 2.4 → 5.2 MB/s; resume was instant |
+| …same — **with** a manual pin (curl Range read) | not needed for a short pause (see next row); pin proven on the server side above |
+| Does the TV close its HTTP connection on pause? | **No**: 1 ESTABLISHED TV↔:12470 connection throughout a 4-min pause → no engine timeout. Pin stays for long pauses / TV standby / processing after playback (untested: TV standby) |
+| Why it stalled before (root cause) | **Confirmed** from the TV's own server (`http://192.168.1.134:11470/settings`, reachable on the LAN): v4.20.8, `cacheSize: 0` (45 MB ring buffer, stops at 75 % full ≈ 30 s of 4K), hard cap 3.5 MiB/s, 55 connections |
+| TV shows subtitles from a hand-served **plain-http** addon on the LAN | ❌ addon installed via the Mac app (it fetched the manifest), TV synced, played → **zero requests** from the TV to the addon |
+| …same addon over **HTTPS** (temporary Cloudflare quick tunnel, shut down right after) | ✅ TV (UA `SMART-TV; LINUX; Tizen 5.5 … Chrome 69`) called `/subtitles/series/tt31510819:1:3/…` **twice per load**: first `filename=` only, ~6 s later `filename` + `videoSize` + `videoHash` (after `/opensubHash`). Selecting the track → TV asks Batman's server `/subtitles.vtt?from=http://192.168.1.132:11471/test.srt` → server (node `Needle`) fetches the SRT over **plain LAN http** → cues shown on the TV at the right times (owner confirmed) |
+| Theater addon UI | no addon list and no "add by URL"; only a **Sync addons** button. Addons are installed from another client (Mac app) on the same account |
+| Server `/proxy` as an HTTPS relay for the addon | ❌ only fetches `https://` upstreams (`ERR_INVALID_PROTOCOL`) |
 | Revert to the TV's own server is one setting | _pending_ |
 | Batman sleeps mid-film → what the TV shows | _pending_ |
 | DTS-audio file plays (server transcodes audio?) · DV file colours | _pending_ |
@@ -57,6 +61,26 @@ At boot the server tests VideoToolbox: **audio hw transcode ✅, video (HEVC) �
 - mlx-whisper's CLI and Python API have **different defaults** (API: temperature fallback, 37 s vs 21 s, different output). Phase 3 must set every decoding option explicitly.
 - Cue-start error ≈ 0.4 s median for both (coarse: reference cues sit on 0.5 s boundaries).
 - At 29× a 2 h film transcribes in ~4 min — far below the torrent download time, so speed isn't the deciding factor; coverage is.
+
+## What this means for the design
+- **Addon endpoints (manifest + `/subtitles/…json`) must be HTTPS** with a publicly trusted cert. Plan: `subs.nomadware.io` (owner's domain) → A record to Batman's LAN IP, Let's Encrypt via DNS-01; LAN-only traffic.
+- **Subtitle files may stay plain http on the LAN**: Batman's streaming server fetches and converts them (`/subtitles.vtt?from=`).
+- Match the engine on the **second** request (`videoHash` + `videoSize`); the first (filename only) can be answered from the filename or with nothing.
+
+## Live Romanian AI subtitles on the TV — 2026-10-21
+Spike `spikes/phase-0/live_ro.py` behind a temporary HTTPS quick tunnel; MobLand S01E03 (4K, E-AC-3 5.1).
+
+| Check | Result |
+|---|---|
+| Pipeline speed | first 2 min of RO ready **25–28 s** after the TV's request (audio 0.5 s, Whisper 5–10 s, Haiku ~12–15 s); whole 50-min episode (814 cues) in **~8 min**, ~5× faster than playback |
+| Owner verdict | "it fucking works" — RO subs shown in sync at 8:50 after a re-select |
+| Refresh | the TV fetches the file once per track selection → a re-select pulls everything generated so far (verified 3×) |
+| Translation via subscription | `claude -p --model claude-haiku-5-5 --tools "" --strict-mcp-config --setting-sources "" --no-session-persistence --system-prompt … --json-schema …` → `structured_output`; `--bare` refuses subscription auth. ~1.3–10 s per call |
+| Usage per 2-min chunk | ~2.4k input (mostly cache) + 2.8k output (1.5k thinking) ≈ $0.002 API-equivalent → **~$0.05 / episode**, ~25 calls |
+| Quality notes | natural, correct diacritics; line breaking needs work (`de / fapt` split) |
+| Real-content STT (bench) | centre channel 13.7 % WER, 197/197 cues covered; downmix 30.9 % (transcribed a song) → centre channel confirmed |
+
+Owner decisions: AI subs for now (label **"Romanian (AI)"**), zero-click selection is the goal (plan phases 2–3), subscription OK with guardrails (serial, hourly cap, personal use).
 
 ## Go / no-go
 _pending_
