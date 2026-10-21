@@ -39,6 +39,23 @@ MIGRATIONS: tuple[str, ...] = (
         PRIMARY KEY (info_hash, file_index, chunk_index)
     );
     """,
+    # Subtitles generated in windows of any length (subtitles/scheduler.py); the fixed 120 s
+    # chunks carry over as spans. subtitle_chunks stays, unused (append-only migrations).
+    """
+    CREATE TABLE subtitle_spans (
+        info_hash   TEXT    NOT NULL,
+        file_index  INTEGER NOT NULL,
+        start_s     REAL    NOT NULL,
+        end_s       REAL    NOT NULL,
+        cues_json   TEXT    NOT NULL,
+        created_at  REAL    NOT NULL,
+        PRIMARY KEY (info_hash, file_index, start_s)
+    );
+    INSERT INTO subtitle_spans
+        SELECT info_hash, file_index, chunk_index * 120.0, (chunk_index + 1) * 120.0,
+               cues_json, created_at
+        FROM subtitle_chunks;
+    """,
 )
 
 

@@ -1,4 +1,4 @@
-"""Every generated subtitle chunk, kept forever (a 50-min episode is ~40 KB): a rewatch or a resume
+"""Every generated subtitle window, kept forever (a 50-min episode is ~40 KB): a rewatch or a resume
 is served from here instead of regenerating."""
 
 import json
@@ -7,6 +7,7 @@ import time
 from dataclasses import dataclass
 
 from stremio_plus_plus.subtitles.cues import Cue
+from stremio_plus_plus.subtitles.scheduler import Span
 
 
 @dataclass(frozen=True)
@@ -61,26 +62,24 @@ class SubtitleStore:
         ).fetchone()
         return _file(row) if row else None
 
-    def done_chunks(self, info_hash: str, file_index: int) -> set[int]:
+    def spans(self, info_hash: str, file_index: int) -> list[Span]:
         rows = self._conn.execute(
-            "SELECT chunk_index FROM subtitle_chunks WHERE info_hash = ? AND file_index = ?",
+            "SELECT start_s, end_s FROM subtitle_spans WHERE info_hash = ? AND file_index = ?",
             (info_hash, file_index),
         ).fetchall()
-        return {int(r[0]) for r in rows}
+        return [(float(r[0]), float(r[1])) for r in rows]
 
-    def save_chunk(
-        self, info_hash: str, file_index: int, chunk_index: int, cues: list[Cue]
-    ) -> None:
+    def save_span(self, info_hash: str, file_index: int, span: Span, cues: list[Cue]) -> None:
         payload = json.dumps([[c.start, c.end, c.text] for c in cues], ensure_ascii=False)
         self._conn.execute(
-            "INSERT OR REPLACE INTO subtitle_chunks VALUES (?, ?, ?, ?, ?)",
-            (info_hash, file_index, chunk_index, payload, time.time()),
+            "INSERT OR REPLACE INTO subtitle_spans VALUES (?, ?, ?, ?, ?, ?)",
+            (info_hash, file_index, span[0], span[1], payload, time.time()),
         )
 
     def cues(self, info_hash: str, file_index: int) -> list[Cue]:
         rows = self._conn.execute(
-            "SELECT cues_json FROM subtitle_chunks WHERE info_hash = ? AND file_index = ?"
-            " ORDER BY chunk_index",
+            "SELECT cues_json FROM subtitle_spans WHERE info_hash = ? AND file_index = ?"
+            " ORDER BY start_s",
             (info_hash, file_index),
         ).fetchall()
         return [
@@ -89,10 +88,10 @@ class SubtitleStore:
             for s, e, t in json.loads(payload)
         ]
 
-    def copy_chunks(self, source: SubtitleFile, info_hash: str, file_index: int) -> None:
+    def copy_spans(self, source: SubtitleFile, info_hash: str, file_index: int) -> None:
         self._conn.execute(
-            """INSERT OR IGNORE INTO subtitle_chunks
-               SELECT ?, ?, chunk_index, cues_json, created_at FROM subtitle_chunks
+            """INSERT OR IGNORE INTO subtitle_spans
+               SELECT ?, ?, start_s, end_s, cues_json, created_at FROM subtitle_spans
                WHERE info_hash = ? AND file_index = ?""",
             (info_hash, file_index, source.info_hash, source.file_index),
         )
