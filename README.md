@@ -1,57 +1,91 @@
 # stremio-companion
 
-A small service that runs next to a Stremio streaming server on a Mac (later: an always-on box) and makes the **official Stremio app on a Samsung TV** better at three things:
+Makes the **official Stremio app on a Samsung TV** play torrents better, using a Mac on the same Wi-Fi:
 
-1. **Keep buffering while paused** — torrents keep downloading the whole file regardless of the playhead.
-2. **Auto-sync subtitles** — out-of-sync subtitles are re-timed against the movie's audio.
-3. **Auto-generate subtitles** — no subtitles? Transcribe the audio and translate it to **Romanian**.
+| | What you get | Status |
+|---|---|---|
+| **Smooth playback** | The Mac downloads the whole file, so pausing actually buffers and resume is instant. The TV's built-in server only keeps ~45 MB. | ✅ working |
+| **Next episode ready** | Starting an episode of a season pack starts downloading the next one. | ✅ working |
+| **Romanian (AI) subtitles** | Generated from the audio (Whisper on the Mac → Claude Haiku), starting where you are in the video; stored forever, so a resume or rewatch is instant. | ✅ working |
+| **Automatic cleanup** | Daily at 04:30: deletes torrents nobody played for 7 days; keeps ≥ 3 GiB free. | ✅ working |
+| Zero-click subtitles, synced human RO subs | Track picked automatically; existing human subtitles re-timed to the audio. | planned ([docs/plan.md](docs/plan.md)) |
 
-No fork of the TV app is needed for any of this (to be confirmed by phase 0 — [docs/plan.md](docs/plan.md)).
+No modified TV app: everything works through two settings in the stock Stremio app.
 
-## Architecture
+## How it fits together
 
 ```
-TV: official Stremio app ── streaming server URL = http://<mac-LAN-IP>:11470
-                        └─ companion addon (synced via the Stremio account) = http://<mac-LAN-IP>:11471/manifest.json
-Mac:
-  Stremio streaming server (official server.js, pinned, under node)           :11470
-    settings: cache = Infinite; torrent profile = fastest
-  stremio-companion (this repo; Python, launchd)                              :11471
-    ├─ engine pin: holds a Range read open per active torrent so a paused TV
-    │   doesn't let the server destroy the engine (ENGINE_TIMEOUT 120 s)
-    ├─ subtitles addon: filename + videoSize + videoHash → active engine via /stats.json
-    ├─ sync: ffsubsync, fallback alass
-    └─ generate: parakeet-mlx / Whisper (mlx) → Claude Haiku EN→RO → SRT
+Samsung TV — Stremio app ("Stremio Theater")
+  │  server URL:  https://<mac-ip-dashed>.519b6502d940.stremio.rocks:12470   (HTTPS: the TV refuses plain http)
+  │  addon:       "Romanian (AI)"  — installed from the Stremio desktop app, synced via your account
+  ▼
+Mac (launchd agents, all from this repo)
+  ├─ Stremio streaming server   official server.js (pinned), node        :11470 http · :12470 https
+  │     cache kept until the companion deletes it; "ultra fast" torrent profile
+  ├─ stremio-companion          Python / FastAPI                          :11471
+  │     ├─ watches the server log → which file the TV plays, where it seeks
+  │     ├─ downloads: keeps the playing file + next episode downloading
+  │     └─ subtitles: audio → Whisper (MLX) → Claude Haiku (`claude` CLI, your plan) → SRT, stored in SQLite
+  └─ cleanup (daily 04:30)      torrents unplayed for 7 days; LRU when disk < 3 GiB
 ```
 
-Details and evidence: [docs/research/stremio-internals.md](docs/research/stremio-internals.md), [docs/research/subtitle-stack.md](docs/research/subtitle-stack.md).
+Why it's built this way, with evidence from the server.js bundle: [docs/research/stremio-internals.md](docs/research/stremio-internals.md). Tool choices and benchmarks: [docs/research/subtitle-stack.md](docs/research/subtitle-stack.md).
+
+## Watching
+
+1. Play anything on the TV as usual.
+2. For Romanian subtitles: subtitles menu → **Romanian (AI)**. The first time a title plays, the first lines take ~30 s. If you see *"Se generează subtitrarea…"*, wait a minute and **select the track again**: each selection loads everything generated so far. On a resume or rewatch they're there immediately.
+3. Pause as long as you like; the download continues.
+
+If the Mac is asleep or off, torrents won't play. Switch the TV back to its own server: [revert](docs/runbooks/tv-setup.md#4-revert).
 
 ## Install on a Mac
 
-Prereqs: Homebrew, `mise` (`brew install mise`), `gh`.
+Needs Homebrew, `brew install mise gh`, Claude Code logged in (`claude`, then `/login`), and a fixed LAN IP for the Mac (router DHCP reservation, see the [TV runbook](docs/runbooks/tv-setup.md#1-give-the-mac-a-fixed-lan-ip)).
 
 ```bash
 git clone https://github.com/fum4/stremio-companion ~/_work/stremio-companion
 cd ~/_work/stremio-companion
 mise trust && mise install
-echo "HOST_LAN_IP=<this Mac's reserved LAN IP>" > .env.local
-mise run onboard               # Brewfile, venv, hooks, Whisper model, launchd agents, then the doctor
-mise run doctor                # re-check any time
+echo "HOST_LAN_IP=<the Mac's reserved LAN IP>" > .env.local
+mise run onboard     # Brewfile, venv, git hooks, Whisper model (~1.6 GB), launchd agents, then the doctor
 ```
 
-- Logs: `~/Library/Logs/stremio-companion/{server,companion}.log`
-- Server data + cache: `~/Library/Application Support/stremio-companion/stremio-server/`
-- Stop / remove: `mise run uninstall-service`
-- Subtitles: the addon **"Romanian (AI)"** generates Romanian subtitles from the audio (Whisper on this Mac → Claude Haiku via your `claude` CLI login), starting where you are in the video; every generated line is stored, so a resume or rewatch is instant. Re-select the track to pull lines generated since.
-- Downloads: the playing file and the **next episode** of a season pack keep downloading in the background; a daily cleanup (04:30, or `mise run cleanup -- --dry-run`) deletes torrents unplayed for 7 days and keeps ≥ 3 GiB free.
-- Per-machine overrides (e.g. your LAN IP): `.env.local` (gitignored). Committed config: `infra/env/*.env`.
+Then point the TV at it and install the addon: [docs/runbooks/tv-setup.md](docs/runbooks/tv-setup.md). Moving to another Mac: [docs/runbooks/migrate-host.md](docs/runbooks/migrate-host.md).
 
-Moving to another Mac: [docs/runbooks/migrate-host.md](docs/runbooks/migrate-host.md).
+## Everyday commands
 
-## Point the TV at it — and back
+| Command | Does |
+|---|---|
+| `mise run doctor` | Checks everything (tools, Claude login, LAN IP, services, model, disk) and prints the TV server URL |
+| `mise run install-service [server\|companion\|cleanup]` | (Re)installs and restarts the launchd agents (all by default) |
+| `mise run uninstall-service` | Stops and removes them |
+| `mise run cleanup -- --dry-run` | Shows what the daily cleanup would delete |
+| `mise run server:configure` | Re-applies the server settings (cache, torrent profile, HTTPS for the LAN IP) |
+| `mise run tunnel` | Temporary public HTTPS address for the addon (until `nomadware.io`; new URL every run) |
+| `mise tasks` | Everything else |
 
-Full steps: [docs/runbooks/tv-setup.md](docs/runbooks/tv-setup.md). In short: give the Mac a DHCP reservation, then in the TV app set **Settings → Streaming → server URL** to the HTTPS URL `mise run doctor` prints (the TV refuses plain http to anything but itself). **To revert**, set it back to the value recorded in the runbook. If the Mac is asleep or off, torrents won't play on the TV until you revert or wake it.
+## Where things live
+
+| What | Where |
+|---|---|
+| Committed config | `infra/env/*.env`, `infra/stremio-server/settings.json` |
+| This Mac's settings | `.env.local` (gitignored): `HOST_LAN_IP`, optional `CLAUDE_CLI` |
+| Logs | `~/Library/Logs/stremio-companion/{server,companion,cleanup}.log` |
+| Torrent cache | `~/Library/Application Support/stremio-companion/stremio-server/stremio-cache/` |
+| Subtitles + play history | `~/Library/Application Support/stremio-companion/companion/state.db` |
+| Whisper model | `~/.cache/huggingface/` |
+
+## Troubleshooting
+
+| Symptom | Check |
+|---|---|
+| TV says the server is **offline** | `mise run doctor`. Is the URL on the TV the **https** one it prints? Did the Mac's IP change (then `server:configure` and re-enter the URL)? |
+| No **Romanian (AI)** track | Is the addon installed (desktop app → Addons) and is the HTTPS front (`mise run tunnel`) running? `companion.log` should show a `subtitles` request when a title opens. |
+| Track shows only *"Se generează…"* | Re-select it after a minute. `companion.log` shows `subtitle_chunk` lines as minutes are generated. |
+| Subtitles stopped mid-film | They were generated up to the point of your last selection; re-select the track. |
+| Disk filling up | `mise run cleanup -- --dry-run`; the cleanup keeps ≥ 3 GiB free automatically. |
 
 ## Develop
 
-`mise tasks` lists everything. `mise run dev` · `test` · `lint` · `format` · `typecheck`. Hooks: `git push` runs `mise run pre-push` (format check, lint, pyright strict); before merging, `mise run gate` runs the tests and posts the `devbox/pre-merge` status on the PR head.
+Python 3.14 + uv, FastAPI, SQLite; layering and rules in [CLAUDE.md](CLAUDE.md). `mise run dev` · `test` · `lint` · `format` · `typecheck`. `git push` runs `mise run pre-push` (format, lint, pyright strict); before merging, `mise run gate` runs the tests and posts the `devbox/pre-merge` status on the PR. Plan and phases: [docs/plan.md](docs/plan.md); open work: [docs/work/](docs/work/), owner to-dos: [TODO.md](TODO.md).
