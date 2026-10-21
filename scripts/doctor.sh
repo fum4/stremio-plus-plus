@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Read-only health check of this host's setup (`mise run doctor`). Exit 1 if anything is red.
+# Read-only health check of this host's setup (`mise run host:doctor`). Exit 1 if anything is red.
 set -uo pipefail
 red=0
 ok()   { printf '  \033[32m✔\033[0m %s\n' "$1"; }
@@ -35,10 +35,10 @@ if curl -sf -m3 "$STREMIO_SERVER_URL/settings" >/dev/null; then
   tv_url="$(curl -sf -m5 "$STREMIO_SERVER_URL/get-https?ipAddress=${HOST_LAN_IP:-}" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("https://%s:%s" % (d["domain"], d["port"]))' 2>/dev/null)"
   [ -n "$tv_url" ] && ok "TV server URL: $tv_url" || warn "no HTTPS endpoint yet" "mise run server:configure"
 else
-  bad "streaming server down" "mise run install-service server"
+  bad "streaming server down" "mise run services:install server"
 fi
-curl -sf -m3 "http://127.0.0.1:$COMPANION_PORT/health" >/dev/null && ok "companion up (:$COMPANION_PORT)" || bad "companion down" "mise run install-service companion; logs: ~/Library/Logs/stremio-companion/companion.log"
-launchctl print "gui/$(id -u)/io.github.fum4.stremio-companion.cleanup" >/dev/null 2>&1 && ok "daily cleanup agent loaded" || bad "cleanup agent missing" "mise run install-service cleanup"
+curl -sf -m3 "http://127.0.0.1:$COMPANION_PORT/health" >/dev/null && ok "companion up (:$COMPANION_PORT)" || bad "companion down" "mise run services:install companion; logs: ~/Library/Logs/stremio-companion/companion.log"
+launchctl print "gui/$(id -u)/io.github.fum4.stremio-companion.cleanup" >/dev/null 2>&1 && ok "daily cleanup agent loaded" || bad "cleanup agent missing" "mise run services:install cleanup"
 
 echo "Data"
 if python -c 'from huggingface_hub import try_to_load_from_cache as t; from stremio_companion.subtitles.constants import WHISPER_MODEL as m; import sys; sys.exit(0 if isinstance(t(m, "config.json"), str) else 1)' 2>/dev/null; then

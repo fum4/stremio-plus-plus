@@ -48,7 +48,7 @@ git clone https://github.com/fum4/stremio-companion ~/_work/stremio-companion
 cd ~/_work/stremio-companion
 mise trust && mise install
 echo "HOST_LAN_IP=<the Mac's reserved LAN IP>" > .env.local
-mise run onboard     # Brewfile, venv, git hooks, Whisper model (~1.6 GB), launchd agents, then the doctor
+mise run host:promote   # this Mac becomes the Stremio host: Brewfile, venv, hooks, Whisper model (~1.6 GB), launchd agents, doctor
 ```
 
 Then point the TV at it and install the addon: [docs/runbooks/tv-setup.md](docs/runbooks/tv-setup.md). Moving to another Mac: [docs/runbooks/migrate-host.md](docs/runbooks/migrate-host.md).
@@ -57,12 +57,13 @@ Then point the TV at it and install the addon: [docs/runbooks/tv-setup.md](docs/
 
 | Command | Does |
 |---|---|
-| `mise run doctor` | Checks everything (tools, Claude login, LAN IP, services, model, disk) and prints the TV server URL |
-| `mise run install-service [server\|companion\|cleanup]` | (Re)installs and restarts the launchd agents (all by default) |
-| `mise run uninstall-service` | Stops and removes them |
+| `mise run host:doctor` | Checks everything (tools, Claude login, LAN IP, services, model, disk) and prints the TV server URL |
+| `mise run services:install [server\|companion\|cleanup]` | (Re)installs and restarts the launchd agents (all by default) |
+| `mise run services:restart` / `services:logs` | Restart the agents / follow all logs |
+| `mise run host:demote` | Stop being the host: removes every agent (data stays) |
 | `mise run cleanup -- --dry-run` | Shows what the daily cleanup would delete |
 | `mise run server:configure` | Re-applies the server settings (cache, torrent profile, HTTPS for the LAN IP) |
-| `mise run tunnel` | Temporary public HTTPS address for the addon (until `nomadware.io`; new URL every run) |
+| `mise run addon:tunnel` | Temporary public HTTPS address for the addon (until `nomadware.io`; new URL every run) |
 | `mise tasks` | Everything else |
 
 ## Where things live
@@ -80,8 +81,8 @@ Then point the TV at it and install the addon: [docs/runbooks/tv-setup.md](docs/
 
 | Symptom | Check |
 |---|---|
-| TV says the server is **offline** | `mise run doctor`. Is the URL on the TV the **https** one it prints? Did the Mac's IP change (then `server:configure` and re-enter the URL)? |
-| No **Romanian (AI)** track | Is the addon installed (desktop app → Addons) and is the HTTPS front (`mise run tunnel`) running? `companion.log` should show a `subtitles` request when a title opens. |
+| TV says the server is **offline** | `mise run host:doctor`. Is the URL on the TV the **https** one it prints? Did the Mac's IP change (then `server:configure` and re-enter the URL)? |
+| No **Romanian (AI)** track | Is the addon installed (desktop app → Addons) and is the HTTPS front (`mise run addon:tunnel`) running? `companion.log` should show a `subtitles` request when a title opens. |
 | Track shows only *"Se generează…"* | Re-select it after a minute. `companion.log` shows `subtitle_chunk` lines as minutes are generated. |
 | Subtitles stopped mid-film | They were generated up to the point of your last selection; re-select the track. |
 | Disk filling up | `mise run cleanup -- --dry-run`; the cleanup keeps ≥ 3 GiB free automatically. |

@@ -5,7 +5,7 @@ Spike run on Batman. Each row: result · evidence · date. Owner go/no-go at the
 ## Setup
 | Step | Result |
 |---|---|
-| Server install (server.js under node, launchd) | ✅ `mise run install-service server` — server.js v4.22.4 under node 24.22.0, listening `*:11470` (+ `*:12470` https). 2026-10-21 |
+| Server install (server.js under node, launchd) | ✅ `mise run services:install server` — server.js v4.22.4 under node 24.22.0, listening `*:11470` (+ `*:12470` https). 2026-10-21 |
 | Cache Infinite + fastest profile — how (UI vs `POST /settings`), resulting `server-settings.json` | ✅ `POST /settings` from `infra/stremio-server/settings.json` (`mise run server:configure`); persisted as `cacheSize: null` + ultra-fast values; survives restart. 2026-10-21 |
 
 ## Server-side pause experiment (no TV) — 2026-10-21

@@ -17,15 +17,15 @@ The TV's server URL contains the Mac's IP, so it must never change.
 1. Mac: System Settings → Wi-Fi → (i) next to the home network → **Private Wi-Fi address: Fixed** (or Off). Not *Rotating*: that changes the MAC and breaks the reservation.
 2. Read the MAC the router will see: `ifconfig en0 | awk '/ether/{print $2}'`.
 3. Router (`http://192.168.1.1`): DHCP / LAN → **Address Reservation** (a.k.a. Static Lease) → that MAC → the IP → save.
-4. Put the IP in `.env.local` as `HOST_LAN_IP=…`; `mise run doctor` confirms it matches.
+4. Put the IP in `.env.local` as `HOST_LAN_IP=…`; `mise run host:doctor` confirms it matches.
 
 ## 2. Start the services on the Mac
-`mise run onboard` on a new Mac, or `mise run install-service`. `mise run doctor` must be all green; it prints the **TV server URL**.
+`mise run host:promote` on a new Mac, or `mise run services:install`. `mise run host:doctor` must be all green; it prints the **TV server URL**.
 
 ## 3. Point the TV at the Mac (HTTPS only)
 The TV app **refuses plain http to anything but `127.0.0.1`**: `http://<mac-ip>:11470` shows "offline" and never reaches the Mac. The server's HTTPS mode solves it: `remoteHttps` = the LAN IP gives a public DNS name that resolves to the LAN IP, with a certificate issued by Stremio's API.
 1. Write down the current server URL on the TV (table above) if it isn't recorded yet.
-2. TV: Stremio → **Settings → Streaming → server URL** → the URL `mise run doctor` prints, e.g. `https://192-168-1-132.519b6502d940.stremio.rocks:12470` → it shows **online**.
+2. TV: Stremio → **Settings → Streaming → server URL** → the URL `mise run host:doctor` prints, e.g. `https://192-168-1-132.519b6502d940.stremio.rocks:12470` → it shows **online**.
 
 A new Mac IP means a new hostname: re-run `mise run server:configure` and re-enter the URL. Needs working internet DNS. A router that blocks public names resolving to private IPs (DNS-rebind protection) would break it; this router is fine (verified 2026-10-21).
 
@@ -34,7 +34,7 @@ TV: Stremio → Settings → Streaming → server URL → **`http://127.0.0.1:11
 
 ## 5. Install the "Romanian (AI)" addon
 The TV app has no "add addon by URL" field; addons come from your Stremio account.
-1. The addon needs an HTTPS address. Until `nomadware.io` is set up: `mise run tunnel` on the Mac prints `https://<random>.trycloudflare.com` (a new one every run).
+1. The addon needs an HTTPS address. Until `nomadware.io` is set up: `mise run addon:tunnel` on the Mac prints `https://<random>.trycloudflare.com` (a new one every run).
 2. Stremio desktop app (same account) → **Addons** → paste `<https address>/manifest.json` into the search box → **Install**. If an older "Romanian (AI)" / "Companion" addon is listed, uninstall it first.
 3. TV: Stremio → Settings → **Sync addons**. The track appears in the subtitles menu as **Romanian (AI)** (language Romanian).
 
