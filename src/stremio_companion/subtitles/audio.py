@@ -63,6 +63,7 @@ async def _run(*argv: str, timeout_s: float) -> bytes:
 async def probe(url: str) -> AudioTrack | None:
     out = await _run(
         "ffprobe",
+        *_PROTOCOLS,
         "-v",
         "error",
         "-rw_timeout",
@@ -83,6 +84,7 @@ async def read_chunk(url: str, track: AudioTrack, start_s: float, length_s: floa
     channel = ["-af", "pan=mono|c0=FC"] if track.center else ["-ac", "1"]
     out = await _run(
         "ffmpeg",
+        *_PROTOCOLS,
         "-v",
         "error",
         "-rw_timeout",
