@@ -4,6 +4,7 @@ pins once files are complete."""
 import asyncio
 from collections.abc import Callable
 
+import httpx
 import structlog
 
 from stremio_plus_plus.downloads.constants import (
@@ -57,7 +58,11 @@ class DownloadManager:
 
     async def sweep(self) -> None:
         for info_hash, file_index in sorted(self._pinner.pinned()):
-            progress = await self._server.file_progress(info_hash, file_index)
+            try:
+                progress = await self._server.file_progress(info_hash, file_index)
+            except httpx.TimeoutException:  # server busy streaming: check this file next sweep
+                log.warning("pin_progress_timeout", info_hash=info_hash, file_index=file_index)
+                continue
             if progress is None or progress >= COMPLETE_PROGRESS:
                 await self._pinner.release(info_hash, file_index)
 

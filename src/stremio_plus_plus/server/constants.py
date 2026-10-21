@@ -5,3 +5,6 @@ REQUEST_TIMEOUT_S = 10.0
 CACHE_SUBDIR = "stremio-cache"
 # Hashing reads the file's first and last 64 KiB, which may first have to be downloaded.
 OPENSUB_HASH_TIMEOUT_S = 120.0
+# server.js /subtitles.vtt gives up on fetching an addon's subtitle source after ~10 s and
+# answers 500 (measured, docs/research/stremio-internals.md § Subtitle proxy).
+SUBTITLE_PROXY_TIMEOUT_S = 10.0

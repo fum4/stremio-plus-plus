@@ -10,7 +10,10 @@ MIN_WINDOW_S = 15.0
 MAX_WINDOW_S = 120.0
 # A subtitle file request that finds nothing yet waits this long for the first window instead
 # of answering with the placeholder straight away (the player fetches once per track selection).
-FIRST_ANSWER_WAIT_S = 20.0
+# Hard ceiling: the TV fetches through server.js /subtitles.vtt, which gives up on the source
+# after ~10 s and answers 500 ("failed to load external subtitles"), measured on the pinned
+# server: 8 s delay → 200, 11 s → 500 at 10.2 s (docs/research/stremio-internals.md).
+FIRST_ANSWER_WAIT_S = 7.0
 OVERLAP_S = 2.0
 WHISPER_MODEL = "mlx-community/whisper-large-v3-turbo"
 TRANSLATE_MODEL = "claude-haiku-5-5"

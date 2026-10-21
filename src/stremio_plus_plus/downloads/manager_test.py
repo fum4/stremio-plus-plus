@@ -59,6 +59,20 @@ async def test_complete_files_are_not_pinned_and_sweep_releases_finished_pins() 
 
 
 @pytest.mark.asyncio
+async def test_a_busy_server_skips_one_file_not_the_whole_sweep() -> None:
+    progress: dict[tuple[str, int], float] = {}
+    manager, pinner, fake = _manager(progress, free=100 * GB)
+    await manager(FileRequested(IH, 0, 0))
+    assert pinner.pinned() == {(IH, 0), (IH, 1)}
+    fake.busy.add((IH, 0))  # E01's progress check times out
+    progress[(IH, 1)] = 1.0
+    await asyncio.sleep(0.01)
+    await manager.sweep()
+    assert pinner.pinned() == {(IH, 0)}  # E02 still released; E01 checked next sweep
+    await pinner.close()
+
+
+@pytest.mark.asyncio
 async def test_engine_destroyed_drops_pins() -> None:
     manager, pinner, _ = _manager({}, free=100 * GB)
     await manager(FileRequested(IH, 1, 0))

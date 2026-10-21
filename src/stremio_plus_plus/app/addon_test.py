@@ -15,6 +15,7 @@ from stremio_plus_plus.config.env import Env
 from stremio_plus_plus.downloads.manager import DownloadManager
 from stremio_plus_plus.downloads.pins import Pinner
 from stremio_plus_plus.server.client import StremioServer
+from stremio_plus_plus.server.constants import SUBTITLE_PROXY_TIMEOUT_S
 from stremio_plus_plus.state.db import open_db
 from stremio_plus_plus.state.plays import Plays
 from stremio_plus_plus.subtitles.cues import Cue
@@ -128,3 +129,8 @@ def test_wrong_token_is_404(tmp_path: Path) -> None:
     client, _ = _client(tmp_path)
     assert client.get("/" + "z" * 32 + "/manifest.json").status_code == 404
     assert client.get("/manifest.json").status_code == 404
+
+
+def test_the_first_answer_wait_stays_under_the_server_subtitle_proxy_timeout() -> None:
+    # Longer, and the TV shows "failed to load external subtitles" instead of the placeholder.
+    assert addon.FIRST_ANSWER_WAIT_S <= SUBTITLE_PROXY_TIMEOUT_S - 2.0
