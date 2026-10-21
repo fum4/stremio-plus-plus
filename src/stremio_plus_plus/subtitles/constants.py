@@ -15,3 +15,6 @@ AUDIO_TIMEOUT_S = 600
 # TV reads past this fraction of the file are the player fetching the MKV index, not the playhead.
 TAIL_READ_FRACTION = 0.98
 MAX_CHUNK_FAILURES = 3
+# A failed file/chunk (e.g. a slow torrent timing out the audio read) is retried on the next
+# subtitles request (the viewer re-selecting the track), at most this often.
+RETRY_FAILED_AFTER_S = 60.0

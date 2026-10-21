@@ -13,6 +13,7 @@ from stremio_plus_plus.subtitles.constants import (
     CHUNK_S,
     MAX_CHUNK_FAILURES,
     OVERLAP_S,
+    RETRY_FAILED_AFTER_S,
     TAIL_READ_FRACTION,
 )
 from stremio_plus_plus.subtitles.cues import Cue
@@ -39,6 +40,7 @@ class _Job:
     meta: SubtitleFile | None = None
     failures: dict[int, int] = field(default_factory=dict[int, int])
     dead: bool = False
+    failed_at: float = 0.0
 
 
 class SubtitleJobs:
@@ -65,7 +67,11 @@ class SubtitleJobs:
         if job is None:
             job = self._jobs[key] = _Job(info_hash, file_index, file_name, file_length)
             job.meta = self._store.file(info_hash, file_index)
-        job.last_active = self._clock()
+        now = self._clock()
+        if (job.dead or job.failures) and now - job.failed_at >= RETRY_FAILED_AFTER_S:
+            job.dead = False  # the torrent may have found peers since: try again
+            job.failures.clear()
+        job.last_active = now
         self._wake.set()
 
     async def __call__(self, event: Event) -> None:
@@ -92,6 +98,7 @@ class SubtitleJobs:
                     await self._generate(job, chunk)
             except Exception:  # one bad chunk or file must not stop subtitles for everything else
                 log.exception("subtitle_chunk_failed", file=job.file_name, chunk=chunk)
+                job.failed_at = self._clock()
                 if chunk is None:
                     job.dead = True
                 else:
@@ -135,6 +142,7 @@ class SubtitleJobs:
         track = await audio.probe(self._server.file_url(job.info_hash, job.file_index))
         if track is None:
             job.dead = True
+            job.failed_at = self._clock()
             log.warning("subtitles_no_audio", file=job.file_name)
             return
         job.meta = SubtitleFile(
