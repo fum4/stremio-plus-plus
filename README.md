@@ -17,16 +17,18 @@ No modified TV app: everything works through two settings in the stock Stremio a
 ```
 Samsung TV — Stremio app ("Stremio Theater")
   │  server URL:  https://<mac-ip-dashed>.519b6502d940.stremio.rocks:12470   (HTTPS: the TV refuses plain http)
-  │  addon:       "Romanian (AI)"  — installed from the Stremio desktop app, synced via your account
+  │  addon:       "Romanian (AI)"  https://stremio.nomadware.io:8443/<secret>/manifest.json
+  │               (public name → the Mac's LAN IP, Let's Encrypt certificate; installed once from the desktop app)
   ▼
 Mac (launchd agents, all from this repo)
   ├─ Stremio streaming server   official server.js (pinned), node        :11470 http · :12470 https
   │     cache kept until the companion deletes it; "ultra fast" torrent profile
-  ├─ stremio-companion          Python / FastAPI                          :11471
+  ├─ stremio-companion          Python / FastAPI                :11471 http (LAN) · :8443 https (addon)
   │     ├─ watches the server log → which file the TV plays, where it seeks
   │     ├─ downloads: keeps the playing file + next episode downloading
   │     └─ subtitles: audio → Whisper (MLX) → Claude Haiku (`claude` CLI, your plan) → SRT, stored in SQLite
-  └─ cleanup (daily 04:30)      torrents unplayed for 7 days; LRU when disk < 3 GiB
+  ├─ cleanup (daily 04:30)      torrents unplayed for 7 days; LRU when disk < 3 GiB
+  └─ tls (weekly)               renews the addon certificate (lego, DNS-01 via Cloudflare)
 ```
 
 Why it's built this way, with evidence from the server.js bundle: [docs/research/stremio-internals.md](docs/research/stremio-internals.md). Tool choices and benchmarks: [docs/research/subtitle-stack.md](docs/research/subtitle-stack.md).
@@ -63,7 +65,8 @@ Then point the TV at it and install the addon: [docs/runbooks/tv-setup.md](docs/
 | `mise run host:demote` | Stop being the host: removes every agent (data stays) |
 | `mise run cleanup -- --dry-run` | Shows what the daily cleanup would delete |
 | `mise run server:configure` | Re-applies the server settings (cache, torrent profile, HTTPS for the LAN IP) |
-| `mise run addon:tunnel` | Temporary public HTTPS address for the addon (until `nomadware.io`; new URL every run) |
+| `mise run addon:url` | The addon URL to install in Stremio (`https://stremio.nomadware.io:8443/<secret>/manifest.json`; keep it private) |
+| `mise run tls:renew` | Get/renew the addon's Let's Encrypt certificate (a weekly agent does this automatically) |
 | `mise tasks` | Everything else |
 
 ## Where things live
@@ -82,7 +85,7 @@ Then point the TV at it and install the addon: [docs/runbooks/tv-setup.md](docs/
 | Symptom | Check |
 |---|---|
 | TV says the server is **offline** | `mise run host:doctor`. Is the URL on the TV the **https** one it prints? Did the Mac's IP change (then `server:configure` and re-enter the URL)? |
-| No **Romanian (AI)** track | Is the addon installed (desktop app → Addons) and is the HTTPS front (`mise run addon:tunnel`) running? `companion.log` should show a `subtitles` request when a title opens. |
+| No **Romanian (AI)** track | Is the addon installed (desktop app → Addons, URL from `mise run addon:url`)? `mise run host:doctor` checks the certificate and that the addon answers over HTTPS. `companion.log` should show a `subtitles` request when a title opens. |
 | Track shows only *"Se generează…"* | Re-select it after a minute. `companion.log` shows `subtitle_chunk` lines as minutes are generated. |
 | Subtitles stopped mid-film | They were generated up to the point of your last selection; re-select the track. |
 | Disk filling up | `mise run cleanup -- --dry-run`; the cleanup keeps ≥ 3 GiB free automatically. |

@@ -14,6 +14,9 @@ VALID = {
     "HOST_LAN_IP": "192.168.1.132",
     "TV_HOST": "192.168.1.134",
     "CLAUDE_CLI": "~/.local/bin/claude",
+    "ADDON_DOMAIN": "stremio.nomadware.io",
+    "ADDON_HTTPS_PORT": "8443",
+    "ADDON_TOKEN": "x" * 32,
     "LOG_LEVEL": "INFO",
     "LOG_FORMAT": "json",
 }
@@ -57,7 +60,12 @@ def test_fails_on_any_missing_value(env: pytest.MonkeyPatch, missing: str) -> No
 
 @pytest.mark.parametrize(
     ("key", "bad"),
-    [("COMPANION_PORT", "0"), ("LOG_LEVEL", "LOUD"), ("HOST_LAN_IP", "batman.local")],
+    [
+        ("COMPANION_PORT", "0"),
+        ("LOG_LEVEL", "LOUD"),
+        ("HOST_LAN_IP", "batman.local"),
+        ("ADDON_TOKEN", "too-short"),
+    ],
 )
 def test_fails_on_invalid_value(env: pytest.MonkeyPatch, key: str, bad: str) -> None:
     _set_all(env, **{key: bad})

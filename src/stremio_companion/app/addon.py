@@ -1,16 +1,29 @@
-"""Stremio addon endpoints: manifest, subtitle list, generated SRT."""
+"""Stremio addon endpoints.
 
+`addon_router` (manifest, subtitle list) sits under the secret `/{token}` prefix and is the only
+thing the public HTTPS listener serves. `lan_router` (generated SRT) is fetched by the streaming
+server over the LAN, on the plain-http port only (https_guard.py).
+"""
+
+import secrets
 from typing import Any
 from urllib.parse import parse_qs
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 
 from stremio_companion.app.services import Services
 from stremio_companion.subtitles.constants import LABEL, LANG
 from stremio_companion.subtitles.cues import Cue, render_srt
 
-router = APIRouter()
+
+def _require_token(request: Request, token: str) -> None:
+    if not secrets.compare_digest(token, _services(request).env.addon_token):
+        raise HTTPException(status_code=404)
+
+
+addon_router = APIRouter(prefix="/{token}", dependencies=[Depends(_require_token)])
+lan_router = APIRouter()
 
 MANIFEST: dict[str, Any] = {
     "id": "io.github.fum4.stremio-companion",
@@ -31,12 +44,12 @@ def _services(request: Request) -> Services:
     return request.app.state.services
 
 
-@router.get("/manifest.json")
+@addon_router.get("/manifest.json")
 async def manifest() -> dict[str, Any]:
     return MANIFEST
 
 
-@router.get("/subtitles/{kind}/{item_id}/{extra}.json")
+@addon_router.get("/subtitles/{kind}/{item_id}/{extra}.json")
 async def subtitles(request: Request, kind: str, item_id: str, extra: str) -> dict[str, Any]:
     services = _services(request)
     params = {k: v[0] for k, v in parse_qs(extra).items()}
@@ -59,7 +72,7 @@ async def subtitles(request: Request, kind: str, item_id: str, extra: str) -> di
     return {"subtitles": []}
 
 
-@router.get("/srt/{info_hash}/{file_index}.srt", response_class=PlainTextResponse)
+@lan_router.get("/srt/{info_hash}/{file_index}.srt", response_class=PlainTextResponse)
 async def srt(request: Request, info_hash: str, file_index: int) -> PlainTextResponse:
     cues = _services(request).subtitle_store.cues(info_hash, file_index)
     return PlainTextResponse(

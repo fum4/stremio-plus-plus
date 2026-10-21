@@ -26,6 +26,10 @@ class Env(BaseSettings):
     host_lan_ip: IPv4Address
     tv_host: IPv4Address
     claude_cli: Path
+    addon_domain: str = Field(min_length=1)
+    addon_https_port: int = Field(ge=1, le=65535)
+    # Secret path segment of the public addon URL (secrets/companion.env.age; repo-secrets exec).
+    addon_token: str = Field(min_length=24, repr=False)
     log_level: LogLevel
     log_format: LogFormat
 
@@ -33,6 +37,11 @@ class Env(BaseSettings):
     @classmethod
     def _expand_home(cls, value: object) -> object:
         return Path(value).expanduser() if isinstance(value, str) else value
+
+    @property
+    def tls_dir(self) -> Path:
+        """lego's data dir: account + certificates for ADDON_DOMAIN."""
+        return self.companion_data_dir / "tls"
 
     @property
     def server_base(self) -> str:

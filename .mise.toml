@@ -78,25 +78,30 @@ run = "repo-secrets check"
 
 [tasks.cleanup]
 description = "Delete cached torrents unplayed for 7 days and evict LRU below the disk reserve (-- --dry-run to preview)"
-run = "python -m stremio_companion.downloads.cleanup_job"
+run = "scripts/with-secrets.sh python -m stremio_companion.downloads.cleanup_job"
 
 [tasks."models:fetch"]
 description = "Download the Whisper model (~1.6 GB, once per machine) into the Hugging Face cache"
 run = "python -c 'from huggingface_hub import snapshot_download; from stremio_companion.subtitles.constants import WHISPER_MODEL; print(snapshot_download(WHISPER_MODEL))'"
 
+[tasks."tls:renew"]
+description = "Get/renew the Let's Encrypt certificate for ADDON_DOMAIN (DNS-01, Cloudflare); restarts the companion when renewed"
+run = "repo-secrets exec secrets/acme.env.age -- scripts/tls-renew.sh"
+
 [tasks.tv]
 description = "Control the TV from this host: pair | status | key KEY_X... | text '<string>' (mise run tv -- pair)"
-run = "python -m stremio_companion.tv.cli"
+run = "scripts/with-secrets.sh python -m stremio_companion.tv.cli"
 
 [tasks."host:promote"]
-description = "Make this Mac the Stremio host: setup, Whisper model, launchd agents, pair with the TV (press Allow), then the doctor (devbox `onboard`)"
+description = "Make this Mac the Stremio host: setup, Whisper model, TLS certificate, launchd agents, pair with the TV (press Allow), then the doctor (devbox `onboard`)"
 alias = "onboard"
 run = [
   "mise run setup",
   "mise run models:fetch",
+  "mise run tls:renew",
   "mise run services:install",
-  "python -m stremio_companion.tv.cli status || python -m stremio_companion.tv.cli pair",
-  "scripts/doctor.sh",
+  "scripts/with-secrets.sh sh -c 'python -m stremio_companion.tv.cli status || python -m stremio_companion.tv.cli pair'",
+  "scripts/with-secrets.sh scripts/doctor.sh",
 ]
 
 [tasks."host:demote"]
@@ -106,15 +111,15 @@ run = "scripts/launchd-uninstall.sh"
 [tasks."host:doctor"]
 description = "Read-only health check of this host (tools, Claude login, LAN IP, services, model, disk) + the TV server URL"
 alias = "doctor"
-run = "scripts/doctor.sh"
+run = "scripts/with-secrets.sh scripts/doctor.sh"
 
-[tasks."addon:tunnel"]
-description = "TEMPORARY HTTPS front for the addon (Cloudflare quick tunnel; new URL every run → reinstall the addon). Replaced by nomadware.io"
-run = "cloudflared tunnel --no-autoupdate --url http://127.0.0.1:${COMPANION_PORT}"
+[tasks."addon:url"]
+description = "Print the addon URL to install in Stremio (contains the secret token: don't share it)"
+run = "scripts/with-secrets.sh sh -c 'echo https://$ADDON_DOMAIN:$ADDON_HTTPS_PORT/$ADDON_TOKEN/manifest.json'"
 
 [tasks.dev]
 description = "Run the companion in the foreground with reload"
-run = "uv run python -m stremio_companion"
+run = "scripts/with-secrets.sh python -m stremio_companion"
 
 [tasks.format]
 description = "Format the code (writes)"

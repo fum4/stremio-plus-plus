@@ -9,7 +9,8 @@ import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from stremio_companion.app.addon import router as addon_router
+from stremio_companion.app.addon import addon_router, lan_router
+from stremio_companion.app.https_guard import HttpsGuard
 from stremio_companion.app.services import Services
 from stremio_companion.config.env import Env
 from stremio_companion.downloads.disk import free_bytes
@@ -88,6 +89,8 @@ def create_app(env: Env) -> FastAPI:
     # Stremio clients fetch addon resources cross-origin.
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"])
     app.include_router(addon_router)
+    app.include_router(lan_router)
+    app.add_middleware(HttpsGuard, https_port=env.addon_https_port, token=env.addon_token)
 
     @app.get("/health")
     async def health() -> dict[str, str]:  # pyright: ignore[reportUnusedFunction]
