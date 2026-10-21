@@ -44,9 +44,7 @@ async def subtitles(request: Request, kind: str, item_id: str, extra: str) -> di
     for engine in (await services.server.engines()).values():
         for f in engine.files:
             if (filename and f.name.rsplit("/", 1)[-1] == filename) or (size and f.length == size):
-                services.subtitles.ensure(
-                    engine.info_hash, f.index, f.name, f.length, params.get("videoHash")
-                )
+                services.subtitles.ensure(engine.info_hash, f.index, f.name, f.length)
                 base = f"http://{services.env.host_lan_ip}:{services.env.companion_port}"
                 return {
                     "subtitles": [

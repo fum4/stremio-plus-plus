@@ -77,7 +77,14 @@ def create_app(env: Env) -> FastAPI:
                 await pinner.close()
                 db.close()
 
-    app = FastAPI(title="stremio-companion", lifespan=lifespan)
+    # No /docs or /openapi.json: the addon is reachable from outside the LAN (HTTPS front).
+    app = FastAPI(
+        title="stremio-companion",
+        lifespan=lifespan,
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+    )
     # Stremio clients fetch addon resources cross-origin.
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"])
     app.include_router(addon_router)

@@ -3,3 +3,5 @@
 COMPANION_TAG = "src=companion"
 REQUEST_TIMEOUT_S = 10.0
 CACHE_SUBDIR = "stremio-cache"
+# Hashing reads the file's first and last 64 KiB, which may first have to be downloaded.
+OPENSUB_HASH_TIMEOUT_S = 120.0

@@ -63,3 +63,19 @@ async def test_file_progress_and_cache_dir() -> None:
     assert await server.file_progress("aa" * 20, 1) == 0.25
     assert await server.file_progress("aa" * 20, 9) is None
     assert str(await server.cache_dir()) == "/data/srv/stremio-cache"
+
+
+@pytest.mark.asyncio
+async def test_opensub_hash_asks_the_server_about_our_tagged_url() -> None:
+    seen: list[str] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        seen.append(str(req.url.params["videoUrl"]))
+        return httpx.Response(
+            200, json={"error": None, "result": {"size": 9, "hash": "cfff08ce8455342c"}}
+        )
+
+    assert (
+        await _server(httpx.MockTransport(handler)).opensub_hash("aa" * 20, 1) == "cfff08ce8455342c"
+    )
+    assert seen == [f"http://srv:11470/{'aa' * 20}/1?src=companion"]

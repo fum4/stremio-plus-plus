@@ -11,6 +11,8 @@ import numpy.typing as npt
 from stremio_companion.subtitles.constants import AUDIO_TIMEOUT_S, SAMPLE_RATE
 
 Audio = npt.NDArray[np.float32]
+# Torrent content is untrusted: a crafted "video" (e.g. a playlist) must not reach local files.
+_PROTOCOLS = ("-protocol_whitelist", "http,tcp")
 
 
 @dataclass(frozen=True)

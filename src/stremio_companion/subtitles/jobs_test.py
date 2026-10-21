@@ -48,8 +48,13 @@ def fake_audio(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(audio, "read_chunk", read_chunk)
 
 
+HASH = "1e894d1e08d0e2b7"
+
+
 def _jobs(tmp_path: Path, stt: FakeStt) -> tuple[SubtitleJobs, SubtitleStore]:
-    server = StremioServer("http://srv", httpx.AsyncClient())
+    # Every file of the same length "is" the same video, as the server would hash it.
+    opensub = httpx.MockTransport(lambda r: httpx.Response(200, json={"result": {"hash": HASH}}))
+    server = StremioServer("http://srv", httpx.AsyncClient(transport=opensub))
     store = SubtitleStore(open_db(tmp_path / "s.db"))
     return SubtitleJobs(server, store, stt, FakeTranslator()), store
 
@@ -65,7 +70,7 @@ async def _until(predicate: Callable[[], bool], timeout: float = 2.0) -> None:
 async def test_resume_mid_file_generates_the_playhead_chunk_first(tmp_path: Path) -> None:
     stt = FakeStt()
     jobs, store = _jobs(tmp_path, stt)
-    jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH, None)
+    jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
     # The TV's resume read lands before the file is even probed (the usual order on a resume).
     await jobs(FileRequested(IH, 2, LENGTH // 2))  # 50 % of 600 s → chunk 2
     runner = asyncio.create_task(jobs.run())
@@ -80,7 +85,7 @@ async def test_resume_mid_file_generates_the_playhead_chunk_first(tmp_path: Path
 async def test_tail_reads_do_not_move_the_playhead(tmp_path: Path) -> None:
     stt = FakeStt()
     jobs, store = _jobs(tmp_path, stt)
-    jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH, None)
+    jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
     await jobs(FileRequested(IH, 2, LENGTH - 10))  # MKV index fetch at the end
     runner = asyncio.create_task(jobs.run())
     await _until(lambda: len(store.done_chunks(IH, 2)) >= 1)
@@ -93,11 +98,11 @@ async def test_tail_reads_do_not_move_the_playhead(tmp_path: Path) -> None:
 async def test_same_video_from_another_torrent_is_reused_without_generation(tmp_path: Path) -> None:
     stt = FakeStt()
     jobs, store = _jobs(tmp_path, stt)
-    jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH, "1e894d1e08d0e2b7")
+    jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
     runner = asyncio.create_task(jobs.run())
     await _until(lambda: len(store.done_chunks(IH, 2)) == 5)
     calls = len(stt.offsets)
-    jobs.ensure("bb" * 20, 0, "Show.S01E03.other.mkv", LENGTH, "1e894d1e08d0e2b7")
+    jobs.ensure("bb" * 20, 0, "Show.S01E03.other.mkv", LENGTH)
     await _until(lambda: len(store.done_chunks("bb" * 20, 0)) == 5)
     runner.cancel()
     assert len(stt.offsets) == calls

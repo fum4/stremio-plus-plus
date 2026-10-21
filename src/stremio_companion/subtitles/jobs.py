@@ -32,7 +32,6 @@ class _Job:
     file_index: int
     file_name: str
     file_length: int
-    video_hash: str | None
     playhead_fraction: float = (
         0.0  # of the file's bytes; kept as a fraction until the duration is known
     )
@@ -59,22 +58,13 @@ class SubtitleJobs:
         self._jobs: dict[FileKey, _Job] = {}
         self._wake = asyncio.Event()
 
-    def ensure(
-        self,
-        info_hash: str,
-        file_index: int,
-        file_name: str,
-        file_length: int,
-        video_hash: str | None,
-    ) -> None:
+    def ensure(self, info_hash: str, file_index: int, file_name: str, file_length: int) -> None:
         """Called on every subtitles request; the job starts (or wakes) and gets priority."""
         key = (info_hash, file_index)
         job = self._jobs.get(key)
         if job is None:
-            job = self._jobs[key] = _Job(info_hash, file_index, file_name, file_length, video_hash)
+            job = self._jobs[key] = _Job(info_hash, file_index, file_name, file_length)
             job.meta = self._store.file(info_hash, file_index)
-        if video_hash and job.video_hash is None:
-            job.video_hash = video_hash
         job.last_active = self._clock()
         self._wake.set()
 
@@ -123,15 +113,17 @@ class SubtitleJobs:
         return None, None
 
     async def _prepare(self, job: _Job) -> None:
-        if job.video_hash and (
-            same := self._store.find_same_video(job.video_hash, job.file_length)
-        ):
+        # Hash computed by the server from the file itself: a client-supplied hash could make
+        # another file reuse the wrong subtitles.
+        video_hash = await self._server.opensub_hash(job.info_hash, job.file_index)
+        same = self._store.find_same_video(video_hash, job.file_length) if video_hash else None
+        if same and (same.info_hash, same.file_index) != (job.info_hash, job.file_index):
             job.meta = SubtitleFile(
                 job.info_hash,
                 job.file_index,
                 job.file_name,
                 job.file_length,
-                job.video_hash,
+                video_hash,
                 same.duration_s,
                 same.audio_stream,
                 same.center,
@@ -150,7 +142,7 @@ class SubtitleJobs:
             job.file_index,
             job.file_name,
             job.file_length,
-            job.video_hash,
+            video_hash,
             track.duration_s,
             track.stream,
             track.center,
