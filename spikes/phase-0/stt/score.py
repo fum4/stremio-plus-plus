@@ -1,5 +1,5 @@
 import json, re, sys, statistics as st
-sys.path.insert(0, '/tmp/stremio-companion-stt/scripts')
+sys.path.insert(0, '/tmp/stremio-plus-plus-stt/scripts')
 from srtlib import parse
 
 CLIP = 600.0

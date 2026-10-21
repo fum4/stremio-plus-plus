@@ -1,7 +1,7 @@
 [project]
-name = "stremio-companion"
+name = "stremio-plus-plus"
 version = "0.1.0"
-description = "Stremio companion: keep torrents downloading while paused, sync and generate subtitles"
+description = "stremio++: a Mac host for the stock Stremio TV app — full buffering, next-episode prefetch, AI subtitles"
 authors = [
     { name = "fum4", email = "andronache.alex22@gmail.com" }
 ]
@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-stremio-companion = "stremio_companion:main"
+stremio-plus-plus = "stremio_plus_plus:main"
 
 [build-system]
 requires = ["uv_build>=0.13.4,<0.14.0"]

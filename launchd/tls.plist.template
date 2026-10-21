@@ -3,7 +3,7 @@
 <!-- Weekly certificate check/renewal for the addon's HTTPS (lego renews only when due). Rendered by `mise run services:install`. -->
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>io.github.fum4.stremio-companion.tls</string>
+  <key>Label</key><string>io.github.fum4.stremio-plus-plus.tls</string>
   <key>ProgramArguments</key>
   <array>
     <string>@MISE@</string><string>exec</string><string>--cd</string><string>@REPO@</string>
@@ -14,7 +14,7 @@
   <dict><key>PATH</key><string>@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
   <!-- Mondays 05:00; launchd runs a missed slot at the next wake. -->
   <key>StartCalendarInterval</key><dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>5</integer><key>Minute</key><integer>0</integer></dict>
-  <key>StandardOutPath</key><string>@HOME@/Library/Logs/stremio-companion/tls.log</string>
-  <key>StandardErrorPath</key><string>@HOME@/Library/Logs/stremio-companion/tls.log</string>
+  <key>StandardOutPath</key><string>@HOME@/Library/Logs/stremio-plus-plus/tls.log</string>
+  <key>StandardErrorPath</key><string>@HOME@/Library/Logs/stremio-plus-plus/tls.log</string>
 </dict>
 </plist>

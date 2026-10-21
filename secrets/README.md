@@ -1,7 +1,7 @@
-# `secrets/` — stremio-companion's encrypted secrets
+# `secrets/` — stremio++'s encrypted secrets
 
-age-encrypted and committed next to the code; decrypted with the stremio-companion age key
-(`~/.config/age/stremio-companion.key`). Pattern and commands: devbox `docs/repo-secrets.md`.
+age-encrypted and committed next to the code; decrypted with the stremio++ age key
+(`~/.config/age/stremio-plus-plus.key`). Pattern and commands: devbox `docs/repo-secrets.md`.
 
 | File | Holds | Read by |
 |---|---|---|

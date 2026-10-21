@@ -1249,7 +1249,7 @@ wheels = [
 ]
 
 [[package]]
-name = "stremio-companion"
+name = "stremio-plus-plus"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

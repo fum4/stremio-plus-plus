@@ -45,7 +45,7 @@ run = "scripts/launchd-restart.sh"
 
 [tasks."services:logs"]
 description = "Follow the server, companion and cleanup logs"
-run = "tail -n 50 -F ~/Library/Logs/stremio-companion/server.log ~/Library/Logs/stremio-companion/companion.log ~/Library/Logs/stremio-companion/cleanup.log"
+run = "tail -n 50 -F ~/Library/Logs/stremio-plus-plus/server.log ~/Library/Logs/stremio-plus-plus/companion.log ~/Library/Logs/stremio-plus-plus/cleanup.log"
 
 [tasks."tools:repo-secrets"]
 description = "Install the pinned devbox repo-secrets engine into ~/.local/bin"
@@ -78,11 +78,11 @@ run = "repo-secrets check"
 
 [tasks.cleanup]
 description = "Delete cached torrents unplayed for 7 days and evict LRU below the disk reserve (-- --dry-run to preview)"
-run = "scripts/with-secrets.sh python -m stremio_companion.downloads.cleanup_job"
+run = "scripts/with-secrets.sh python -m stremio_plus_plus.downloads.cleanup_job"
 
 [tasks."models:fetch"]
 description = "Download the Whisper model (~1.6 GB, once per machine) into the Hugging Face cache"
-run = "python -c 'from huggingface_hub import snapshot_download; from stremio_companion.subtitles.constants import WHISPER_MODEL; print(snapshot_download(WHISPER_MODEL))'"
+run = "python -c 'from huggingface_hub import snapshot_download; from stremio_plus_plus.subtitles.constants import WHISPER_MODEL; print(snapshot_download(WHISPER_MODEL))'"
 
 [tasks."tls:renew"]
 description = "Get/renew the Let's Encrypt certificate for ADDON_DOMAIN (DNS-01, Cloudflare); restarts the companion when renewed"
@@ -90,7 +90,7 @@ run = "repo-secrets exec secrets/acme.env.age -- scripts/tls-renew.sh"
 
 [tasks.tv]
 description = "Control the TV from this host: pair | status | key KEY_X... | text '<string>' (mise run tv -- pair)"
-run = "scripts/with-secrets.sh python -m stremio_companion.tv.cli"
+run = "scripts/with-secrets.sh python -m stremio_plus_plus.tv.cli"
 
 [tasks."host:promote"]
 description = "Make this Mac the Stremio host: setup, Whisper model, TLS certificate, launchd agents, pair with the TV (press Allow), then the doctor (devbox `onboard`)"
@@ -100,7 +100,7 @@ run = [
   "mise run models:fetch",
   "mise run tls:renew",
   "mise run services:install",
-  "scripts/with-secrets.sh sh -c 'python -m stremio_companion.tv.cli status || python -m stremio_companion.tv.cli pair'",
+  "scripts/with-secrets.sh sh -c 'python -m stremio_plus_plus.tv.cli status || python -m stremio_plus_plus.tv.cli pair'",
   "scripts/with-secrets.sh scripts/doctor.sh",
 ]
 
@@ -119,7 +119,7 @@ run = "scripts/with-secrets.sh sh -c 'echo https://$ADDON_DOMAIN:$ADDON_HTTPS_PO
 
 [tasks.dev]
 description = "Run the companion in the foreground with reload"
-run = "scripts/with-secrets.sh python -m stremio_companion"
+run = "scripts/with-secrets.sh python -m stremio_plus_plus"
 
 [tasks.format]
 description = "Format the code (writes)"

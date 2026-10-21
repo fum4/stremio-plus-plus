@@ -1,4 +1,6 @@
-# stremio-companion
+# stremio++
+
+Repo and package slug: `stremio-plus-plus` (GitHub allows no `+` in names).
 
 Makes the **official Stremio app on a Samsung TV** play torrents better, using a Mac on the same Wi-Fi:
 
@@ -23,7 +25,7 @@ Samsung TV — Stremio app ("Stremio Theater")
 Mac (launchd agents, all from this repo)
   ├─ Stremio streaming server   official server.js (pinned), node        :11470 http · :12470 https
   │     cache kept until the companion deletes it; "ultra fast" torrent profile
-  ├─ stremio-companion          Python / FastAPI                :11471 http (LAN) · :8443 https (addon)
+  ├─ companion                  Python / FastAPI                :11471 http (LAN) · :8443 https (addon)
   │     ├─ watches the server log → which file the TV plays, where it seeks
   │     ├─ downloads: keeps the playing file + next episode downloading
   │     └─ subtitles: audio → Whisper (MLX) → Claude Haiku (`claude` CLI, your plan) → SRT, stored in SQLite
@@ -46,8 +48,8 @@ If the Mac is asleep or off, torrents won't play. Switch the TV back to its own 
 Needs Homebrew, `brew install mise gh`, Claude Code logged in (`claude`, then `/login`), and a fixed LAN IP for the Mac (router DHCP reservation, see the [TV runbook](docs/runbooks/tv-setup.md#1-give-the-mac-a-fixed-lan-ip)).
 
 ```bash
-git clone https://github.com/fum4/stremio-companion ~/_work/stremio-companion
-cd ~/_work/stremio-companion
+git clone https://github.com/fum4/stremio-plus-plus ~/_work/stremio-plus-plus
+cd ~/_work/stremio-plus-plus
 mise trust && mise install
 echo "HOST_LAN_IP=<the Mac's reserved LAN IP>" > .env.local
 mise run host:promote   # this Mac becomes the Stremio host: Brewfile, venv, hooks, Whisper model (~1.6 GB), launchd agents, doctor
@@ -75,9 +77,9 @@ Then point the TV at it and install the addon: [docs/runbooks/tv-setup.md](docs/
 |---|---|
 | Committed config | `infra/env/*.env`, `infra/stremio-server/settings.json` |
 | This Mac's settings | `.env.local` (gitignored): `HOST_LAN_IP`, optional `CLAUDE_CLI` |
-| Logs | `~/Library/Logs/stremio-companion/{server,companion,cleanup}.log` |
-| Torrent cache | `~/Library/Application Support/stremio-companion/stremio-server/stremio-cache/` |
-| Subtitles + play history | `~/Library/Application Support/stremio-companion/companion/state.db` |
+| Logs | `~/Library/Logs/stremio-plus-plus/{server,companion,cleanup}.log` |
+| Torrent cache | `~/Library/Application Support/stremio-plus-plus/stremio-server/stremio-cache/` |
+| Subtitles + play history | `~/Library/Application Support/stremio-plus-plus/companion/state.db` |
 | Whisper model | `~/.cache/huggingface/` |
 
 ## Troubleshooting

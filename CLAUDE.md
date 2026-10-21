@@ -1,4 +1,4 @@
-# stremio-companion — repo rules
+# stremio++ — repo rules
 
 The cross-repo rules are the owner's global agent rules (devbox `agents/AGENTS.md`); this file adds only what is specific to this repo. Never restate a global rule here.
 
@@ -13,7 +13,7 @@ A Python service + launchd setup on the owner's Mac (**Batman**) that extends th
 - **Subtitles are served only when finished.** stremio-core requests subtitles once per load; never serve a partial track.
 - **The translation model never sees timestamps.** Cue ids in, cue ids out; code re-applies timings and re-wraps (≤ 2 lines × ~42 chars).
 
-## Layering (src/stremio_companion/)
+## Layering (src/stremio_plus_plus/)
 `config/` (typed env, the only reader of the environment) · `log/` → `server/` (Stremio server HTTP client) · `state/` (SQLite, append-only migrations) → `watch/` (server-log tracker → playback events) → feature packages (`downloads/`, `subtitles/`) → `app/` (FastAPI routes + lifespan wiring) → `boot.py`. Imports point only leftwards; feature packages never import each other. One concern per file, ≤ ~200 LOC, a `constants.py` per package for magic values, tests as `*_test.py` next to the code (Python module names are `snake_case`; the global kebab-case filename rule yields to the import system here).
 - Every request the companion makes to the server carries `?src=companion` (`server.client.StremioServer.file_url`) so the tracker never mistakes our reads for the TV's.
 - Per-run env overrides go through `mise exec -- env KEY=… <cmd>`: mise's env files win over variables set before `mise exec`.
@@ -21,7 +21,7 @@ A Python service + launchd setup on the owner's Mac (**Batman**) that extends th
 ## Mac-specific workflow (no `wt`, `devstack`, Ansible on Batman)
 - Branch + PR for every change; `.githooks/pre-push` refuses pushes to `main` and runs `mise run pre-push`.
 - Before merging: `mise run gate` (stand-in for `wt pre-merge`) posts `devbox/pre-merge` on the PR head.
-- Session artifacts go to `/tmp/stremio-companion-*`, never the repo.
+- Session artifacts go to `/tmp/stremio-plus-plus-*`, never the repo.
 
 ## Routing
 | Occasion | Doc | Guardrail |

@@ -18,7 +18,7 @@ Bump server.js → re-verify every `server.js:` row below in the same PR.
 | Settings file `server-settings.json` in `SETTINGS_PATH` or `APP_PATH` | `server.js:12991` |
 | ffmpeg/ffprobe searched in `--ffmpeg`, `FFMPEG_BIN`/`FFPROBE_BIN`, next to node, then system paths | `server.js:47750` |
 
-We set our own `APP_PATH` (`~/Library/Application Support/stremio-companion/stremio-server`) so a Stremio desktop install never shares or trims our cache.
+We set our own `APP_PATH` (`~/Library/Application Support/stremio-plus-plus/stremio-server`) so a Stremio desktop install never shares or trims our cache.
 
 ## Cache and download limits
 | Fact | Evidence |
@@ -34,7 +34,7 @@ We set our own `APP_PATH` (`~/Library/Application Support/stremio-companion/stre
 
 **A huge finite value** (we use 4 TiB) keeps everything: `toSize = min(cacheSize, used + free − required)`, and a file is deleted only while the running total exceeds `toSize`, which never happens for files already on disk. So the server never trims and the disk can fill.
 
-→ For us (since 2026-10-21, plan phase 2): cache = **4 TiB** ("keep until we decide"), and the companion owns deletion: the daily `cleanup` agent drops torrents unplayed for 7 days and evicts least-recently-used torrents below a 3 GiB free-space reserve, never touching live engines (`src/stremio_companion/downloads/cleanup.py`). Phase 0 used `null`, which wiped a show's files as soon as another title started — wrong for "resume tomorrow" and rewatches.
+→ For us (since 2026-10-21, plan phase 2): cache = **4 TiB** ("keep until we decide"), and the companion owns deletion: the daily `cleanup` agent drops torrents unplayed for 7 days and evicts least-recently-used torrents below a 3 GiB free-space reserve, never touching live engines (`src/stremio_plus_plus/downloads/cleanup.py`). Phase 0 used `null`, which wiped a show's files as soon as another title started — wrong for "resume tomorrow" and rewatches.
 
 ## Torrent profiles
 stremio-web `useStreamingOptions.ts:30-61`: default (hard 3.5 MiB/s, 55 conns), soft, fast (hard 37.5 MiB/s, 200 conns), **ultra fast** (hard 75 MiB/s, soft 8 MiB/s, 400 conns, 25 s handshake, 6 s request timeout). We apply ultra fast + the cache size from `infra/stremio-server/settings.json` via `POST /settings` (`mise run server:configure`; re-applied on every `services:install server`). `POST /settings` merges and persists to `$APP_PATH/server-settings.json`; verified surviving a restart.
