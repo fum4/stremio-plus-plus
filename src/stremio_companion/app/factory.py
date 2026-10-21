@@ -10,6 +10,9 @@ from fastapi import FastAPI
 
 from stremio_companion.app.services import Services
 from stremio_companion.config.env import Env
+from stremio_companion.downloads.disk import free_bytes
+from stremio_companion.downloads.manager import DownloadManager
+from stremio_companion.downloads.pins import Pinner
 from stremio_companion.server.client import StremioServer
 from stremio_companion.state.db import open_db
 from stremio_companion.state.plays import Plays
@@ -26,17 +29,38 @@ def create_app(env: Env) -> FastAPI:
         db = open_db(env.companion_data_dir / "state.db")
         async with httpx.AsyncClient() as http:
             server = StremioServer(env.server_base, http)
-            services = Services(env=env, http=http, db=db, server=server, plays=Plays(db))
-            app.state.services = services
-            tracker = asyncio.create_task(
-                run_tracker(follow(env.stremio_server_log), [PlayRecorder(server, services.plays)]),
-                name="tracker",
+            cache_dir = await server.cache_dir()
+            pinner = Pinner(http, server)
+            plays = Plays(db)
+            downloads = DownloadManager(server, pinner, lambda: free_bytes(cache_dir))
+            services = Services(
+                env=env,
+                http=http,
+                db=db,
+                server=server,
+                plays=plays,
+                pinner=pinner,
+                downloads=downloads,
             )
-            log.info("companion_started", data_dir=str(env.companion_data_dir))
+            app.state.services = services
+            workers = [
+                asyncio.create_task(
+                    run_tracker(
+                        follow(env.stremio_server_log), [PlayRecorder(server, plays), downloads]
+                    ),
+                    name="tracker",
+                ),
+                asyncio.create_task(downloads.run_sweeper(), name="pin-sweeper"),
+            ]
+            log.info(
+                "companion_started", data_dir=str(env.companion_data_dir), cache_dir=str(cache_dir)
+            )
             try:
                 yield
             finally:
-                tracker.cancel()
+                for worker in workers:
+                    worker.cancel()
+                await pinner.close()
                 db.close()
 
     app = FastAPI(title="stremio-companion", lifespan=lifespan)

@@ -6,6 +6,8 @@ from dataclasses import dataclass
 import httpx
 
 from stremio_companion.config.env import Env
+from stremio_companion.downloads.manager import DownloadManager
+from stremio_companion.downloads.pins import Pinner
 from stremio_companion.server.client import StremioServer
 from stremio_companion.state.plays import Plays
 
@@ -17,3 +19,5 @@ class Services:
     db: sqlite3.Connection
     server: StremioServer
     plays: Plays
+    pinner: Pinner
+    downloads: DownloadManager

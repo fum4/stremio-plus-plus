@@ -48,3 +48,18 @@ async def test_remove_hits_the_remove_route() -> None:
 def test_file_url_is_tagged() -> None:
     server = _server(httpx.MockTransport(lambda req: httpx.Response(200)))
     assert server.file_url("cc" * 20, 3) == f"http://srv:11470/{'cc' * 20}/3?src=companion"
+
+
+@pytest.mark.asyncio
+async def test_file_progress_and_cache_dir() -> None:
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.path.endswith("/1/stats.json"):
+            return httpx.Response(200, json={"streamProgress": 0.25})
+        if req.url.path.endswith("/9/stats.json"):
+            return httpx.Response(200, content=b"")
+        return httpx.Response(200, json={"values": {"cacheRoot": "/data/srv"}})
+
+    server = _server(httpx.MockTransport(handler))
+    assert await server.file_progress("aa" * 20, 1) == 0.25
+    assert await server.file_progress("aa" * 20, 9) is None
+    assert str(await server.cache_dir()) == "/data/srv/stremio-cache"

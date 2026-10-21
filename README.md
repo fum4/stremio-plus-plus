@@ -41,6 +41,7 @@ mise run install-service       # fetch the pinned server.js, load the launchd ag
 - Logs: `~/Library/Logs/stremio-companion/{server,companion}.log`
 - Server data + cache: `~/Library/Application Support/stremio-companion/stremio-server/`
 - Stop / remove: `mise run uninstall-service`
+- Downloads: the playing file and the **next episode** of a season pack keep downloading in the background; a daily cleanup (04:30, or `mise run cleanup -- --dry-run`) deletes torrents unplayed for 7 days and keeps ≥ 3 GiB free.
 - Per-machine overrides (e.g. your LAN IP): `.env.local` (gitignored). Committed config: `infra/env/*.env`.
 
 ## Point the TV at it — and back

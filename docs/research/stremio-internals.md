@@ -32,10 +32,12 @@ We set our own `APP_PATH` (`~/Library/Application Support/stremio-companion/stre
 
 **What `null` actually does** (`clearCache`, `server.js:36236-36266`): the early return is `toSize == 1/0`, which `null` fails; then `Math.min(null, …)` coerces to `0`, so **every engine creation deletes every cached file of every *inactive* engine**. Files of engines still in `enginefs.list()` are skipped (`omit`). So "∞" really means "keep only what's active, clean the rest on the next engine creation" — no re-watch cache, but no disk fill either.
 
-→ For us: cache = `null`. The file we're processing stays safe **as long as its engine is alive** — the engine pin is what guarantees that. A huge finite value would instead keep everything until the disk is full (`toSize` is capped at `used + free`).
+**A huge finite value** (we use 4 TiB) keeps everything: `toSize = min(cacheSize, used + free − required)`, and a file is deleted only while the running total exceeds `toSize`, which never happens for files already on disk. So the server never trims and the disk can fill.
+
+→ For us (since 2026-10-21, plan phase 2): cache = **4 TiB** ("keep until we decide"), and the companion owns deletion: the daily `cleanup` agent drops torrents unplayed for 7 days and evicts least-recently-used torrents below a 3 GiB free-space reserve, never touching live engines (`src/stremio_companion/downloads/cleanup.py`). Phase 0 used `null`, which wiped a show's files as soon as another title started — wrong for "resume tomorrow" and rewatches.
 
 ## Torrent profiles
-stremio-web `useStreamingOptions.ts:30-61`: default (hard 3.5 MiB/s, 55 conns), soft, fast (hard 37.5 MiB/s, 200 conns), **ultra fast** (hard 75 MiB/s, soft 8 MiB/s, 400 conns, 25 s handshake, 6 s request timeout). We apply ultra fast + `cacheSize: null` from `infra/stremio-server/settings.json` via `POST /settings` (`mise run server:configure`; re-applied on every `install-service`). `POST /settings` merges and persists to `$APP_PATH/server-settings.json`; verified surviving a restart.
+stremio-web `useStreamingOptions.ts:30-61`: default (hard 3.5 MiB/s, 55 conns), soft, fast (hard 37.5 MiB/s, 200 conns), **ultra fast** (hard 75 MiB/s, soft 8 MiB/s, 400 conns, 25 s handshake, 6 s request timeout). We apply ultra fast + the cache size from `infra/stremio-server/settings.json` via `POST /settings` (`mise run server:configure`; re-applied on every `install-service`). `POST /settings` merges and persists to `$APP_PATH/server-settings.json`; verified surviving a restart.
 
 ## Engine lifecycle
 | Fact | Evidence |

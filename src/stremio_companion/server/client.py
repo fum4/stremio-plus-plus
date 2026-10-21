@@ -1,10 +1,11 @@
 """Thin async client for the Stremio streaming server's HTTP API (server.js, closed bundle)."""
 
+from pathlib import Path
 from typing import Any, cast
 
 import httpx
 
-from stremio_companion.server.constants import COMPANION_TAG, REQUEST_TIMEOUT_S
+from stremio_companion.server.constants import CACHE_SUBDIR, COMPANION_TAG, REQUEST_TIMEOUT_S
 from stremio_companion.server.models import Engine, TorrentFile
 
 
@@ -37,6 +38,23 @@ class StremioServer:
         resp.raise_for_status()
         data = cast(dict[str, dict[str, Any]], resp.json())
         return {ih: _parse_engine(ih, raw) for ih, raw in data.items()}
+
+    async def file_progress(self, info_hash: str, file_index: int) -> float | None:
+        """Fraction of the file's pieces on disk (`streamProgress`), None if the engine is gone."""
+        resp = await self._http.get(
+            f"{self._base}/{info_hash}/{file_index}/stats.json", timeout=REQUEST_TIMEOUT_S
+        )
+        if resp.status_code != 200 or not resp.content.strip():
+            return None
+        data = cast(dict[str, Any] | None, resp.json())
+        return float(data.get("streamProgress") or 0) if data else None
+
+    async def cache_dir(self) -> Path:
+        """`<cacheRoot>/stremio-cache`: one sub-directory per info hash (server.js getCachePath)."""
+        resp = await self._http.get(f"{self._base}/settings", timeout=REQUEST_TIMEOUT_S)
+        resp.raise_for_status()
+        values = cast(dict[str, Any], resp.json()["values"])
+        return Path(str(values["cacheRoot"])) / CACHE_SUBDIR
 
     async def remove(self, info_hash: str) -> None:
         resp = await self._http.get(f"{self._base}/{info_hash}/remove", timeout=REQUEST_TIMEOUT_S)

@@ -2,3 +2,4 @@
 # our own reads (pin, audio extraction) from the TV's in the server log.
 COMPANION_TAG = "src=companion"
 REQUEST_TIMEOUT_S = 10.0
+CACHE_SUBDIR = "stremio-cache"

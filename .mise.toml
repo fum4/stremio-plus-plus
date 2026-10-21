@@ -68,6 +68,10 @@ run = "repo-secrets edit"
 description = "Every manifest row has its sources (exit 1 otherwise)"
 run = "repo-secrets check"
 
+[tasks.cleanup]
+description = "Delete cached torrents unplayed for 7 days and evict LRU below the disk reserve (-- --dry-run to preview)"
+run = "python -m stremio_companion.downloads.cleanup_job"
+
 [tasks.dev]
 description = "Run the companion in the foreground with reload"
 run = "uv run python -m stremio_companion"
