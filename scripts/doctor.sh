@@ -82,7 +82,8 @@ if [ -n "$tv_up" ]; then ok "TV reachable ($tv_os at $TV_HOST:$tv_up)"; else war
 python -m stremio_plus_plus.tv.cli status >/dev/null 2>&1 && ok "this host is paired with the TV" || bad "not paired with the TV" "mise run tv -- pair ($tv_pair)"
 
 echo "Data"
-if python -c 'from huggingface_hub import try_to_load_from_cache as t; from stremio_plus_plus.subtitles.constants import WHISPER_MODEL as m; import sys; sys.exit(0 if isinstance(t(m, "config.json"), str) else 1)' 2>/dev/null; then
+# The model named in config.toml (subtitles.speech.model).
+if python -c 'import os, sys; from pathlib import Path; from huggingface_hub import try_to_load_from_cache as t; from stremio_plus_plus.config.settings_file import SettingsFile; m = SettingsFile(Path(os.environ["CONFIG_DIR"]).expanduser()).settings.subtitles.speech.model; sys.exit(0 if isinstance(t(m, "config.json"), str) else 1)' 2>/dev/null; then
   ok "Whisper model cached"
 else
   bad "Whisper model not downloaded" "mise run models:fetch"
