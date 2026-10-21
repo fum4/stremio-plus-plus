@@ -3,8 +3,10 @@
 import asyncio
 from typing import Any, Protocol, cast
 
+import numpy as np
+
 from stremio_plus_plus.subtitles.audio import Audio
-from stremio_plus_plus.subtitles.constants import WHISPER_MODEL
+from stremio_plus_plus.subtitles.constants import SAMPLE_RATE, WHISPER_MODEL
 from stremio_plus_plus.subtitles.cues import Cue
 
 
@@ -19,6 +21,11 @@ class WhisperMlx:
     def __init__(self, model: str = WHISPER_MODEL) -> None:
         self._model = model
         self._lock = asyncio.Lock()  # one inference at a time on the GPU
+
+    async def warm(self) -> None:
+        """Load the model now: the first load takes ~10 s, which would otherwise land on the
+        first subtitle window after every companion start."""
+        await self.transcribe(np.zeros(SAMPLE_RATE, np.float32), 0.0)
 
     async def transcribe(self, audio: Audio, offset_s: float) -> list[Cue]:
         async with self._lock:

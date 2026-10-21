@@ -41,8 +41,9 @@ def create_app(env: Env) -> FastAPI:
             plays = Plays(db)
             downloads = DownloadManager(server, pinner, lambda: free_bytes(cache_dir))
             subtitle_store = SubtitleStore(db)
+            whisper = WhisperMlx()
             subtitles = SubtitleJobs(
-                server, subtitle_store, WhisperMlx(), ClaudeCliTranslator(env.claude_cli)
+                server, subtitle_store, whisper, ClaudeCliTranslator(env.claude_cli)
             )
             services = Services(
                 env=env,
@@ -66,6 +67,7 @@ def create_app(env: Env) -> FastAPI:
                 ),
                 asyncio.create_task(downloads.run_sweeper(), name="pin-sweeper"),
                 asyncio.create_task(subtitles.run(), name="subtitles"),
+                asyncio.create_task(whisper.warm(), name="whisper-warm"),
             ]
             log.info(
                 "companion_started", data_dir=str(env.companion_data_dir), cache_dir=str(cache_dir)
