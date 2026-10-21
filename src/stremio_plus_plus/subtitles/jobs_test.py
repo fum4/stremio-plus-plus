@@ -12,12 +12,13 @@ from stremio_plus_plus.subtitles import audio
 from stremio_plus_plus.subtitles.audio import Audio, AudioTrack
 from stremio_plus_plus.subtitles.cues import Cue
 from stremio_plus_plus.subtitles.jobs import SubtitleJobs
+from stremio_plus_plus.subtitles.scheduler import merged
 from stremio_plus_plus.subtitles.store import SubtitleStore
 from stremio_plus_plus.watch.events import FileRequested
 
 IH = "aa" * 20
 LENGTH = 1_000_000
-DURATION = 600.0  # 5 chunks of 120 s
+DURATION = 600.0
 
 
 class FakeStt:
@@ -59,6 +60,11 @@ def _jobs(tmp_path: Path, stt: FakeStt) -> tuple[SubtitleJobs, SubtitleStore]:
     return SubtitleJobs(server, store, stt, FakeTranslator()), store
 
 
+def _complete(store: SubtitleStore, ih: str = IH, index: int = 2) -> bool:
+    spans = merged(store.spans(ih, index))
+    return len(spans) == 1 and spans[0][0] == 0.0 and spans[0][1] >= DURATION
+
+
 async def _until(predicate: Callable[[], bool], timeout: float = 2.0) -> None:
     async with asyncio.timeout(timeout):
         while not predicate():
@@ -67,17 +73,21 @@ async def _until(predicate: Callable[[], bool], timeout: float = 2.0) -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("fake_audio")
-async def test_resume_mid_file_generates_the_playhead_chunk_first(tmp_path: Path) -> None:
+async def test_resume_mid_file_starts_ahead_of_the_playhead_then_covers_everything(
+    tmp_path: Path,
+) -> None:
     stt = FakeStt()
     jobs, store = _jobs(tmp_path, stt)
     jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
     # The TV's resume read lands before the file is even probed (the usual order on a resume).
-    await jobs(FileRequested(IH, 2, LENGTH // 2))  # 50 % of 600 s → chunk 2
+    await jobs(FileRequested(IH, 2, LENGTH // 2))  # 50 % of 600 s → 300 s
     runner = asyncio.create_task(jobs.run())
-    await _until(lambda: len(store.done_chunks(IH, 2)) == 5)
+    await _until(lambda: _complete(store))
     runner.cancel()
-    # 30 s lead-in at the playhead (300 s), then its chunk, ahead, back-fill.
-    assert [int(o) for o in stt.offsets] == [298, 238, 358, 478, 118, 0]
+    # First window aimed where the viewer will be (300 + 12.5 s), read with 2 s overlap.
+    assert stt.offsets[0] == 310.5
+    ahead = [o for o in stt.offsets if o >= 310.5]
+    assert ahead == sorted(ahead)  # forward from the playhead before any back-fill
     assert all(c.text.startswith("ro:") for c in store.cues(IH, 2))
 
 
@@ -89,9 +99,9 @@ async def test_tail_reads_do_not_move_the_playhead(tmp_path: Path) -> None:
     jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
     await jobs(FileRequested(IH, 2, LENGTH - 10))  # MKV index fetch at the end
     runner = asyncio.create_task(jobs.run())
-    await _until(lambda: len(store.done_chunks(IH, 2)) >= 1)
+    await _until(lambda: bool(store.spans(IH, 2)))
     runner.cancel()
-    assert stt.offsets[0] == 0.0
+    assert stt.offsets[0] == 10.5  # from the start (12.5 s ahead of 0), not the end
 
 
 @pytest.mark.asyncio
@@ -101,10 +111,10 @@ async def test_same_video_from_another_torrent_is_reused_without_generation(tmp_
     jobs, store = _jobs(tmp_path, stt)
     jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
     runner = asyncio.create_task(jobs.run())
-    await _until(lambda: len(store.done_chunks(IH, 2)) == 5)
+    await _until(lambda: _complete(store))
     calls = len(stt.offsets)
     jobs.ensure("bb" * 20, 0, "Show.S01E03.other.mkv", LENGTH)
-    await _until(lambda: len(store.done_chunks("bb" * 20, 0)) == 5)
+    await _until(lambda: _complete(store, "bb" * 20, 0))
     runner.cancel()
     assert len(stt.offsets) == calls
 
@@ -142,35 +152,56 @@ async def test_a_failed_probe_is_retried_when_the_track_is_selected_again(
     assert len(probes) == 1
     now[0] += 60  # re-selected a minute later: retried and generated
     jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
-    await _until(lambda: len(store.done_chunks(IH, 2)) == 5)
+    await _until(lambda: _complete(store))
     runner.cancel()
     assert len(probes) == 2
 
 
 @pytest.mark.asyncio
-async def test_the_lead_in_is_served_before_its_chunk_is_done(
+async def test_the_first_window_is_served_while_the_rest_is_still_downloading(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    full_chunk = asyncio.Event()  # the torrent is slow: a whole chunk's audio isn't there yet
+    later = asyncio.Event()  # the torrent is slow: audio past the first window isn't there yet
 
     async def probe(url: str) -> AudioTrack:
         return AudioTrack(0, True, DURATION)
 
     async def read_chunk(url: str, track: AudioTrack, start_s: float, length_s: float) -> Audio:
-        if length_s > 60:
-            await full_chunk.wait()
+        if start_s > 20:
+            await later.wait()
         return np.zeros(16000, np.float32)
 
     monkeypatch.setattr(audio, "probe", probe)
     monkeypatch.setattr(audio, "read_chunk", read_chunk)
-    stt = FakeStt()
-    jobs, store = _jobs(tmp_path, stt)
+    jobs, store = _jobs(tmp_path, FakeStt())
     jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
     runner = asyncio.create_task(jobs.run())
     await _until(lambda: bool(jobs.cues(IH, 2)))
-    assert store.done_chunks(IH, 2) == set()
-    assert [c.text for c in jobs.cues(IH, 2)] == ["ro:line@0"]
-    full_chunk.set()
-    await _until(lambda: len(store.done_chunks(IH, 2)) == 5)
+    assert store.spans(IH, 2) == [(12.5, 27.5)]
+    later.set()
+    await _until(lambda: _complete(store))
     runner.cancel()
-    assert len(jobs.cues(IH, 2)) == 5  # the lead-in is replaced by its chunk, not duplicated
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("fake_audio")
+async def test_the_next_window_is_transcribed_while_the_previous_is_translated(
+    tmp_path: Path,
+) -> None:
+    stt = FakeStt()
+
+    class WaitsForNextTranscription(FakeTranslator):
+        async def translate(self, lines: list[str], context: list[str]) -> list[str]:
+            # Only finishes once Whisper has moved on: deadlocks if the steps ran one by one.
+            await _until(lambda: len(stt.offsets) >= 2 or _complete(store))
+            return await super().translate(lines, context)
+
+    opensub = httpx.MockTransport(lambda r: httpx.Response(200, json={"result": {}}))
+    server = StremioServer("http://srv", httpx.AsyncClient(transport=opensub))
+    store = SubtitleStore(open_db(tmp_path / "s.db"))
+    jobs = SubtitleJobs(server, store, stt, WaitsForNextTranscription())
+    jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
+    runner = asyncio.create_task(jobs.run())
+    await _until(lambda: len(store.spans(IH, 2)) >= 1)
+    runner.cancel()
+    assert len(stt.offsets) >= 2

@@ -1,24 +1,28 @@
-"""Generates Romanian subtitles chunk by chunk for the files the TV plays, playhead first."""
+"""Generates Romanian subtitles window by window for the files the TV plays, playhead first.
+
+Window sizes come from scheduler.py. Whisper (GPU) and Claude (network) are pipelined: the next
+window is transcribed while the previous one is being translated, so one step costs about the
+slower of the two instead of their sum.
+"""
 
 import asyncio
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
+from typing import Any
 
 import structlog
 
 from stremio_plus_plus.server.client import StremioServer
 from stremio_plus_plus.subtitles import audio
 from stremio_plus_plus.subtitles.constants import (
-    CHUNK_S,
-    LEAD_IN_S,
-    MAX_CHUNK_FAILURES,
+    MAX_WINDOW_FAILURES,
     OVERLAP_S,
     RETRY_FAILED_AFTER_S,
     TAIL_READ_FRACTION,
 )
 from stremio_plus_plus.subtitles.cues import Cue
-from stremio_plus_plus.subtitles.scheduler import chunk_count, next_chunk
+from stremio_plus_plus.subtitles.scheduler import Span, next_window
 from stremio_plus_plus.subtitles.store import SubtitleFile, SubtitleStore
 from stremio_plus_plus.subtitles.stt import Transcriber
 from stremio_plus_plus.subtitles.translate import Translator
@@ -39,10 +43,10 @@ class _Job:
     )
     last_active: float = 0.0
     meta: SubtitleFile | None = None
-    failures: dict[int, int] = field(default_factory=dict[int, int])
+    failures: dict[Span, int] = field(default_factory=dict[Span, int])
+    in_flight: list[Span] = field(default_factory=list[Span])
     dead: bool = False
     failed_at: float = 0.0
-    lead_ins: dict[int, list[Cue]] = field(default_factory=dict[int, list[Cue]])
 
     def playhead_s(self) -> float:
         return self.playhead_fraction * (self.meta.duration_s if self.meta else 0.0)
@@ -80,14 +84,7 @@ class SubtitleJobs:
         self._wake.set()
 
     def cues(self, info_hash: str, file_index: int) -> list[Cue]:
-        """Stored cues, plus the lead-in of any chunk still being generated."""
-        stored = self._store.cues(info_hash, file_index)
-        job = self._jobs.get((info_hash, file_index))
-        if job is None or not job.lead_ins:
-            return stored
-        done = self._store.done_chunks(info_hash, file_index)
-        extra = [c for i, cues in job.lead_ins.items() if i not in done for c in cues]
-        return sorted(stored + extra, key=lambda c: c.start)
+        return self._store.cues(info_hash, file_index)
 
     def generating(self, info_hash: str, file_index: int) -> bool:
         job = self._jobs.get((info_hash, file_index))
@@ -104,41 +101,62 @@ class SubtitleJobs:
         self._wake.set()
 
     async def run(self) -> None:
-        while True:
-            job, chunk, lead_in = self._pick()
-            if job is None:
-                self._wake.clear()
-                await self._wake.wait()
-                continue
-            try:
-                if job.meta is None:
-                    await self._prepare(job)
-                elif chunk is not None and lead_in:
-                    await self._generate_lead_in(job, chunk)
-                elif chunk is not None:
-                    await self._generate(job, chunk)
-            except Exception:  # one bad chunk or file must not stop subtitles for everything else
-                log.exception("subtitle_chunk_failed", file=job.file_name, chunk=chunk)
-                job.failed_at = self._clock()
-                if chunk is None:
-                    job.dead = True
-                else:
-                    job.failures[chunk] = job.failures.get(chunk, 0) + 1
+        translating: asyncio.Task[None] | None = None
+        try:
+            while True:
+                job, window = self._pick()
+                if job is None:
+                    if translating is not None:  # its window may unlock the next one
+                        await translating
+                        translating = None
+                        continue
+                    self._wake.clear()
+                    await self._wake.wait()
+                    continue
+                if window is None:  # not probed yet
+                    await self._guard(job, None, self._prepare(job))
+                    continue
+                job.in_flight.append(window)
+                heard = await self._guard(job, window, self._hear(job, window))
+                if translating is not None:  # in order: this window's context is that one
+                    await translating
+                    translating = None
+                if heard is None:
+                    job.in_flight.remove(window)
+                    continue
+                translating = asyncio.create_task(self._translate(job, window, heard))
+        finally:
+            if translating is not None:
+                translating.cancel()
 
-    def _pick(self) -> tuple[_Job | None, int | None, bool]:
+    async def _guard[T](
+        self, job: _Job, window: Span | None, step: Coroutine[Any, Any, T]
+    ) -> T | None:
+        try:
+            return await step
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # one bad window or file must not stop subtitles for everything else
+            log.exception("subtitle_window_failed", file=job.file_name, window=window)
+            job.failed_at = self._clock()
+            if window is None:
+                job.dead = True
+            else:
+                job.failures[window] = job.failures.get(window, 0) + 1
+            return None
+
+    def _pick(self) -> tuple[_Job | None, Span | None]:
         for job in sorted(self._jobs.values(), key=lambda j: j.last_active, reverse=True):
             if job.dead:
                 continue
             if job.meta is None:
-                return job, None, False
-            done = self._store.done_chunks(job.info_hash, job.file_index)
-            skipped = {i for i, n in job.failures.items() if n >= MAX_CHUNK_FAILURES}
-            total = chunk_count(job.meta.duration_s, CHUNK_S)
-            playhead_chunk = int(job.playhead_s() // CHUNK_S)
-            chunk = next_chunk(done | skipped, total, playhead_chunk)
-            if chunk is not None:
-                return job, chunk, chunk == playhead_chunk and chunk not in job.lead_ins
-        return None, None, False
+                return job, None  # probe first
+            skipped = [w for w, n in job.failures.items() if n >= MAX_WINDOW_FAILURES]
+            covered = self._store.spans(job.info_hash, job.file_index) + job.in_flight + skipped
+            window = next_window(covered, job.meta.duration_s, job.playhead_s())
+            if window is not None:
+                return job, window
+        return None, None
 
     async def _prepare(self, job: _Job) -> None:
         # Hash computed by the server from the file itself: a client-supplied hash could make
@@ -157,7 +175,7 @@ class SubtitleJobs:
                 same.center,
             )
             self._store.save_file(job.meta)
-            self._store.copy_chunks(same, job.info_hash, job.file_index)
+            self._store.copy_spans(same, job.info_hash, job.file_index)
             log.info("subtitles_reused_from_same_video", file=job.file_name)
             return
         track = await audio.probe(self._server.file_url(job.info_hash, job.file_index))
@@ -184,48 +202,39 @@ class SubtitleJobs:
             center=track.center,
         )
 
-    async def _romanian(self, job: _Job, start_s: float, end_s: float) -> list[Cue]:
-        """Cues starting in [start_s, end_s), transcribed and translated."""
+    async def _hear(self, job: _Job, window: Span) -> tuple[list[Cue], float]:
+        """English cues starting inside the window, and when work on it started."""
         assert job.meta is not None
-        window_start = max(0.0, start_s - OVERLAP_S)
+        t0 = self._clock()
+        start, end = window
+        read_from = max(0.0, start - OVERLAP_S)
         track = audio.AudioTrack(job.meta.audio_stream, job.meta.center, job.meta.duration_s)
         samples = await audio.read_chunk(
-            self._server.file_url(job.info_hash, job.file_index),
-            track,
-            window_start,
-            end_s - window_start,
+            self._server.file_url(job.info_hash, job.file_index), track, read_from, end - read_from
         )
-        heard = await self._stt.transcribe(samples, window_start)
-        own = [c for c in heard if start_s <= c.start < end_s]
-        context = [
-            c.text for c in self._store.cues(job.info_hash, job.file_index) if c.start < start_s
-        ]
-        romanian = await self._translator.translate([c.text for c in own], context)
-        return [Cue(c.start, c.end, ro) for c, ro in zip(own, romanian, strict=True)]
+        heard = await self._stt.transcribe(samples, read_from)
+        return [c for c in heard if start <= c.start < end], t0
 
-    async def _generate_lead_in(self, job: _Job, chunk: int) -> None:
-        job.lead_ins[chunk] = []  # attempted: a failure falls through to the full chunk
-        t0 = self._clock()
-        start = max(float(chunk * CHUNK_S), job.playhead_s())
-        end = min(start + LEAD_IN_S, (chunk + 1) * CHUNK_S)
-        job.lead_ins[chunk] = await self._romanian(job, start, end)
-        log.info(
-            "subtitle_lead_in",
-            file=job.file_name,
-            chunk=chunk,
-            cues=len(job.lead_ins[chunk]),
-            seconds=round(self._clock() - t0, 1),
-        )
-
-    async def _generate(self, job: _Job, chunk: int) -> None:
-        t0 = self._clock()
-        cues = await self._romanian(job, float(chunk * CHUNK_S), float((chunk + 1) * CHUNK_S))
-        self._store.save_chunk(job.info_hash, job.file_index, chunk, cues)
-        job.lead_ins.pop(chunk, None)
-        log.info(
-            "subtitle_chunk",
-            file=job.file_name,
-            chunk=chunk,
-            cues=len(cues),
-            seconds=round(self._clock() - t0, 1),
-        )
+    async def _translate(self, job: _Job, window: Span, heard: tuple[list[Cue], float]) -> None:
+        own, t0 = heard
+        try:
+            earlier = self._store.cues(job.info_hash, job.file_index)
+            context = [c.text for c in earlier if c.start < window[0]]
+            romanian = await self._guard(
+                job, window, self._translator.translate([c.text for c in own], context)
+            )
+            if romanian is None:
+                return
+            cues = [Cue(c.start, c.end, ro) for c, ro in zip(own, romanian, strict=True)]
+            self._store.save_span(job.info_hash, job.file_index, window, cues)
+            log.info(
+                "subtitle_window",
+                file=job.file_name,
+                start=round(window[0], 1),
+                end=round(window[1], 1),
+                cues=len(cues),
+                seconds=round(self._clock() - t0, 1),
+            )
+        finally:
+            job.in_flight.remove(window)
+            self._wake.set()

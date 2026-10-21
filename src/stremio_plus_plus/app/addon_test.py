@@ -108,7 +108,7 @@ def test_unknown_file_gets_no_track(tmp_path: Path) -> None:
 def test_srt_serves_stored_cues_or_a_placeholder(tmp_path: Path) -> None:
     client, store = _client(tmp_path)
     assert "Se generează" in client.get(f"/srt/{IH}/0.srt").text
-    store.save_chunk(IH, 0, 0, [Cue(1.0, 2.0, "Unu")])
+    store.save_span(IH, 0, (0.0, 15.0), [Cue(1.0, 2.0, "Unu")])
     assert client.get(f"/srt/{IH}/0.srt").text == "1\n00:00:01,000 --> 00:00:02,000\nUnu\n"
 
 

@@ -88,7 +88,7 @@ Then point the TV at it and install the addon: [docs/runbooks/tv-setup.md](docs/
 |---|---|
 | TV says the server is **offline** | `mise run host:doctor`. Is the URL on the TV the **https** one it prints? Did the Mac's IP change (then `server:configure` and re-enter the URL)? |
 | No **Romanian (AI)** track | Is the **Stremio++** addon installed (desktop app → Addons, URL from `mise run addon:url`)? `mise run host:doctor` checks the certificate and that the addon answers over HTTPS. `companion.log` should show a `subtitles` request when a title opens. |
-| Track shows only *"Se generează…"* | Re-select it after a minute. `companion.log` shows `subtitle_chunk` lines as minutes are generated. |
+| Track shows only *"Se generează…"* | Re-select it after a minute. `companion.log` shows `subtitle_window` lines as windows are generated. |
 | Subtitles stopped mid-film | They were generated up to the point of your last selection; re-select the track. |
 | Disk filling up | `mise run cleanup -- --dry-run`; the cleanup keeps ≥ 3 GiB free automatically. |
 
