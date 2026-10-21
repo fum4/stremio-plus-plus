@@ -8,7 +8,7 @@ Makes the **official Stremio app on a Samsung TV** play torrents better, using a
 |---|---|---|
 | **Smooth playback** | The Mac downloads the whole file, so pausing actually buffers and resume is instant. The TV's built-in server only keeps ~45 MB. | ✅ working |
 | **Next episode ready** | Starting an episode of a season pack starts downloading the next one. | ✅ working |
-| **Romanian (AI) subtitles** | Generated from the audio (Whisper on the Mac → Claude Haiku), starting where you are in the video; stored forever, so a resume or rewatch is instant. | ✅ working |
+| **Romanian (AI) subtitles** | Generated from the audio (Whisper on the Mac → Claude Haiku), starting where you are in the video; the **next episode is generated in full while you watch**, so it works the moment it starts; stored forever, so a resume or rewatch is instant. | ✅ working |
 | **Automatic cleanup** | Daily at 04:30: deletes torrents nobody played for 7 days; keeps ≥ 3 GiB free. | ✅ working |
 | Zero-click subtitles, synced human RO subs | Track picked automatically; existing human subtitles re-timed to the audio. | planned ([docs/plan.md](docs/plan.md)) |
 
@@ -38,7 +38,7 @@ Why it's built this way, with evidence from the server.js bundle: [docs/research
 ## Watching
 
 1. Play anything on the TV as usual.
-2. For Romanian subtitles: subtitles menu → **Romanian (AI)**. The first time a title plays, the first 30 s of lines are generated from where you are and served within ~10 s on a well-seeded torrent (a slow one has to download the audio first). If you see *"Se generează subtitrarea…"*, wait a minute and **select the track again**: each selection loads everything generated so far. On a resume or rewatch they're there immediately.
+2. For Romanian subtitles: subtitles menu → **Romanian (AI)**. Generation starts when the episode loads; the first 15 s of lines (from just ahead of where you are) are ready ~10 s later on a well-seeded torrent. The TV loads the track once per selection, and Stremio auto-selects Romanian if you chose it last time, often before anything is ready. If you see *"Se generează subtitrarea…"*, or the lines run out, switch subtitles **off and back on to Romanian (AI)**: each load gets everything generated so far (re-selecting the active track does nothing). The next episode of a season pack is generated in full while you watch the current one, so when it starts the track is complete and needs no toggle; only the first episode you play of a new show needs one. On a resume or rewatch they're there immediately.
 3. Pause as long as you like; the download continues.
 
 If the Mac is asleep or off, torrents won't play. Switch the TV back to its own server: [revert](docs/runbooks/tv-setup.md#4-revert).
@@ -89,8 +89,8 @@ Then point the TV at it and install the addon: [docs/runbooks/tv-setup.md](docs/
 |---|---|
 | TV says the server is **offline** | `mise run host:doctor`. Is the URL on the TV the **https** one it prints? Did the Mac's IP change (then `server:configure` and re-enter the URL)? |
 | No **Romanian (AI)** track | Is the **Stremio++** addon installed (desktop app → Addons, URL from `mise run addon:url`)? `mise run host:doctor` checks the certificate and that the addon answers over HTTPS. `companion.log` should show a `subtitles` request when a title opens. |
-| Track shows only *"Se generează…"* | Re-select it after a minute. `companion.log` shows `subtitle_window` lines as windows are generated. |
-| Subtitles stopped mid-film | They were generated up to the point of your last selection; re-select the track. |
+| Track shows only *"Se generează…"* | Switch subtitles **off and back on to Romanian (AI)** (re-selecting the active track does nothing). `companion.log` shows `subtitle_window` lines as windows are generated. |
+| Subtitles stopped mid-film | The TV loaded them up to the point of your last selection; switch subtitles off and back on to Romanian (AI). `companion.log` `srt_served` shows what each load got. |
 | Disk filling up | `mise run cleanup -- --dry-run`; the cleanup keeps ≥ 3 GiB free automatically. |
 
 ## Develop

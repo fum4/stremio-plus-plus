@@ -39,11 +39,13 @@ def create_app(env: Env) -> FastAPI:
             cache_dir = await server.cache_dir()
             pinner = Pinner(http, server)
             plays = Plays(db)
-            downloads = DownloadManager(server, pinner, lambda: free_bytes(cache_dir))
             subtitle_store = SubtitleStore(db)
             whisper = WhisperMlx()
             subtitles = SubtitleJobs(
                 server, subtitle_store, whisper, ClaudeCliTranslator(env.claude_cli)
+            )
+            downloads = DownloadManager(
+                server, pinner, lambda: free_bytes(cache_dir), subtitles.prepare_next
             )
             services = Services(
                 env=env,

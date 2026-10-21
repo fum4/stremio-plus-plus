@@ -70,7 +70,13 @@ def next_window(covered: list[Span], duration: float, playhead: float) -> Span |
         if end < duration:
             length = (end - playhead - STEP_FIXED_S) / STEP_PER_S
             return _window_at(spans, end, min(max(length, MIN_WINDOW_S), MAX_WINDOW_S), duration)
-    cursor = 0.0  # back-fill: the first gap from the start of the file
+    return next_fill(spans, duration)  # back-fill once everything ahead is covered
+
+
+def next_fill(covered: list[Span], duration: float) -> Span | None:
+    """The first gap from the start of the file, in MAX_WINDOW_S windows."""
+    spans = merged(covered)
+    cursor = 0.0
     for start, stop in spans:
         if start - cursor > 0.5:
             return _window_at(spans, cursor, MAX_WINDOW_S, duration)

@@ -22,7 +22,7 @@ from stremio_plus_plus.subtitles.constants import (
     TAIL_READ_FRACTION,
 )
 from stremio_plus_plus.subtitles.cues import Cue
-from stremio_plus_plus.subtitles.scheduler import Span, next_window
+from stremio_plus_plus.subtitles.scheduler import Span, next_fill, next_window
 from stremio_plus_plus.subtitles.store import SubtitleFile, SubtitleStore
 from stremio_plus_plus.subtitles.stt import Transcriber
 from stremio_plus_plus.subtitles.translate import Translator
@@ -47,6 +47,7 @@ class _Job:
     in_flight: list[Span] = field(default_factory=list[Span])
     dead: bool = False
     failed_at: float = 0.0
+    queued_ahead: bool = False  # the next episode, not playing yet: fill from the start
 
     def playhead_s(self) -> float:
         return self.playhead_fraction * (self.meta.duration_s if self.meta else 0.0)
@@ -76,11 +77,29 @@ class SubtitleJobs:
         if job is None:
             job = self._jobs[key] = _Job(info_hash, file_index, file_name, file_length)
             job.meta = self._store.file(info_hash, file_index)
+        job.queued_ahead = False  # it's on screen now
         now = self._clock()
         if (job.dead or job.failures) and now - job.failed_at >= RETRY_FAILED_AFTER_S:
             job.dead = False  # the torrent may have found peers since: try again
             job.failures.clear()
         job.last_active = now
+        self._wake.set()
+
+    def prepare_next(
+        self, info_hash: str, playing_index: int, file_index: int, file_name: str, file_length: int
+    ) -> None:
+        """The next episode of a file being watched with Romanian subtitles: generate all of it
+        once the playing one is covered, so the TV's single load as it starts gets the whole
+        track (the player loads a subtitle file once per selection, at the episode's start)."""
+        playing = self._jobs.get((info_hash, playing_index))
+        key = (info_hash, file_index)
+        if playing is None or key in self._jobs:
+            return
+        job = self._jobs[key] = _Job(info_hash, file_index, file_name, file_length)
+        job.meta = self._store.file(info_hash, file_index)
+        job.queued_ahead = True
+        job.last_active = 0.0  # after every file actually being watched
+        log.info("subtitles_queued_next_episode", file=file_name)
         self._wake.set()
 
     def cues(self, info_hash: str, file_index: int) -> list[Cue]:
@@ -97,6 +116,7 @@ class SubtitleJobs:
         if job is None or event.offset > job.file_length * TAIL_READ_FRACTION:
             return
         job.playhead_fraction = event.offset / max(job.file_length, 1)
+        job.queued_ahead = False
         job.last_active = self._clock()
         self._wake.set()
 
@@ -153,7 +173,10 @@ class SubtitleJobs:
                 return job, None  # probe first
             skipped = [w for w, n in job.failures.items() if n >= MAX_WINDOW_FAILURES]
             covered = self._store.spans(job.info_hash, job.file_index) + job.in_flight + skipped
-            window = next_window(covered, job.meta.duration_s, job.playhead_s())
+            if job.queued_ahead:
+                window = next_fill(covered, job.meta.duration_s)
+            else:
+                window = next_window(covered, job.meta.duration_s, job.playhead_s())
             if window is not None:
                 return job, window
         return None, None
