@@ -27,17 +27,25 @@ description = "Download the pinned streaming server.js into var/ and verify its 
 run = "scripts/stremio-server-fetch.sh"
 
 [tasks."server:configure"]
-description = "Apply infra/stremio-server/settings.json (cache Infinite, ultra-fast torrent profile) to the running server"
+description = "Apply infra/stremio-server/settings.json (keep-everything cache, ultra-fast torrent profile, HTTPS for HOST_LAN_IP) to the running server"
 run = "scripts/stremio-server-configure.sh"
 
-[tasks.install-service]
-description = "Render launchd/*.plist.template into ~/Library/LaunchAgents and (re)load them (args: server companion; default all)"
+[tasks."services:install"]
+description = "Render launchd/*.plist.template into ~/Library/LaunchAgents and (re)load them (args: server companion cleanup; default all)"
 depends = ["server:fetch"]
 run = "scripts/launchd-install.sh"
 
-[tasks.uninstall-service]
-description = "Unload and remove the launchd agents (args: server companion; default all)"
+[tasks."services:uninstall"]
+description = "Unload and remove the launchd agents (args: server companion cleanup; default all)"
 run = "scripts/launchd-uninstall.sh"
+
+[tasks."services:restart"]
+description = "Restart running launchd agents without re-rendering them (args: server companion; default server + companion)"
+run = "scripts/launchd-restart.sh"
+
+[tasks."services:logs"]
+description = "Follow the server, companion and cleanup logs"
+run = "tail -n 50 -F ~/Library/Logs/stremio-companion/server.log ~/Library/Logs/stremio-companion/companion.log ~/Library/Logs/stremio-companion/cleanup.log"
 
 [tasks."tools:repo-secrets"]
 description = "Install the pinned devbox repo-secrets engine into ~/.local/bin"
@@ -75,6 +83,29 @@ run = "python -m stremio_companion.downloads.cleanup_job"
 [tasks."models:fetch"]
 description = "Download the Whisper model (~1.6 GB, once per machine) into the Hugging Face cache"
 run = "python -c 'from huggingface_hub import snapshot_download; from stremio_companion.subtitles.constants import WHISPER_MODEL; print(snapshot_download(WHISPER_MODEL))'"
+
+[tasks."host:promote"]
+description = "Make this Mac the Stremio host: setup, Whisper model, all launchd agents, then the doctor (devbox `onboard`)"
+alias = "onboard"
+run = [
+  "mise run setup",
+  "mise run models:fetch",
+  "mise run services:install",
+  "scripts/doctor.sh",
+]
+
+[tasks."host:demote"]
+description = "Stop being the Stremio host: unload and remove every launchd agent (cache, subtitles and history stay on disk)"
+run = "scripts/launchd-uninstall.sh"
+
+[tasks."host:doctor"]
+description = "Read-only health check of this host (tools, Claude login, LAN IP, services, model, disk) + the TV server URL"
+alias = "doctor"
+run = "scripts/doctor.sh"
+
+[tasks."addon:tunnel"]
+description = "TEMPORARY HTTPS front for the addon (Cloudflare quick tunnel; new URL every run → reinstall the addon). Replaced by nomadware.io"
+run = "cloudflared tunnel --no-autoupdate --url http://127.0.0.1:${COMPANION_PORT}"
 
 [tasks.dev]
 description = "Run the companion in the foreground with reload"

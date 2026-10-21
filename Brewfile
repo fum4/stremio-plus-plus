@@ -5,4 +5,5 @@ brew "ffmpeg"   # ffprobe/ffmpeg: audio extraction; also the streaming server's 
 brew "age"      # repo secrets (devbox repo-secrets engine)
 brew "bash"     # repo-secrets needs bash >= 4 (mapfile); macOS ships 3.2
 brew "gh"
+brew "cloudflared"  # temporary HTTPS front for the addon (mise run tunnel) until nomadware.io
 brew "alass"    # subtitle sync fallback (splits/ad breaks ffsubsync can't handle); no macOS release binary upstream

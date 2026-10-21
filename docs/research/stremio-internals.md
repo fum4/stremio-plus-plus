@@ -37,7 +37,7 @@ We set our own `APP_PATH` (`~/Library/Application Support/stremio-companion/stre
 → For us (since 2026-10-21, plan phase 2): cache = **4 TiB** ("keep until we decide"), and the companion owns deletion: the daily `cleanup` agent drops torrents unplayed for 7 days and evicts least-recently-used torrents below a 3 GiB free-space reserve, never touching live engines (`src/stremio_companion/downloads/cleanup.py`). Phase 0 used `null`, which wiped a show's files as soon as another title started — wrong for "resume tomorrow" and rewatches.
 
 ## Torrent profiles
-stremio-web `useStreamingOptions.ts:30-61`: default (hard 3.5 MiB/s, 55 conns), soft, fast (hard 37.5 MiB/s, 200 conns), **ultra fast** (hard 75 MiB/s, soft 8 MiB/s, 400 conns, 25 s handshake, 6 s request timeout). We apply ultra fast + the cache size from `infra/stremio-server/settings.json` via `POST /settings` (`mise run server:configure`; re-applied on every `install-service`). `POST /settings` merges and persists to `$APP_PATH/server-settings.json`; verified surviving a restart.
+stremio-web `useStreamingOptions.ts:30-61`: default (hard 3.5 MiB/s, 55 conns), soft, fast (hard 37.5 MiB/s, 200 conns), **ultra fast** (hard 75 MiB/s, soft 8 MiB/s, 400 conns, 25 s handshake, 6 s request timeout). We apply ultra fast + the cache size from `infra/stremio-server/settings.json` via `POST /settings` (`mise run server:configure`; re-applied on every `services:install server`). `POST /settings` merges and persists to `$APP_PATH/server-settings.json`; verified surviving a restart.
 
 ## Engine lifecycle
 | Fact | Evidence |

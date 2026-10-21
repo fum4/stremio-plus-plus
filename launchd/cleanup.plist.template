@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Daily cache cleanup (torrents unplayed for 7 days + disk-reserve eviction). Rendered by `mise run install-service`. -->
+<!-- Daily cache cleanup (torrents unplayed for 7 days + disk-reserve eviction). Rendered by `mise run services:install`. -->
 <plist version="1.0">
 <dict>
   <key>Label</key><string>io.github.fum4.stremio-companion.cleanup</string>

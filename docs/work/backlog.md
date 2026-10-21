@@ -7,7 +7,7 @@ Cleanup deletes whole torrents only: the server keeps a per-torrent piece bitfie
 Pins are released once a file is complete; phase 3's subtitle job reads the file after that. Fine while the engine lives (the job's own reads keep it alive), but make the pin release explicit: release only when complete **and** no job holds the file.
 
 ## Linux (systemd) templates for the always-on box · 2026-10-21 · S
-`launchd/` only today. When the move to a Mac mini / N100 is decided: add `systemd/` units mirroring the plists and branch `install-service` on `uname`.
+`launchd/` only today. When the move to a Mac mini / N100 is decided: add `systemd/` units mirroring the plists and branch `services:install` on `uname`.
 
 ## Converge the Mac gate with `wt` · 2026-10-21 · S
 `.githooks/pre-push` and `scripts/pre-merge-gate.sh` are Mac stand-ins for the devbox global hooks + `wt pre-merge`. If `wt`/the hooks become installable on macOS, delete these and use them.
