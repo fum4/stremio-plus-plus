@@ -74,9 +74,9 @@ def _client(tmp_path: Path) -> tuple[TestClient, SubtitleStore]:
     return TestClient(app), store
 
 
-def test_manifest_names_the_addon_romanian_ai(tmp_path: Path) -> None:
+def test_manifest_names_the_addon_stremio_plus_plus(tmp_path: Path) -> None:
     client, _ = _client(tmp_path)
-    assert client.get(f"/{TOKEN}/manifest.json").json()["name"] == "Romanian (AI)"
+    assert client.get(f"/{TOKEN}/manifest.json").json()["name"] == "Stremio++"
 
 
 def test_subtitles_request_matches_the_playing_file_by_name(tmp_path: Path) -> None:
