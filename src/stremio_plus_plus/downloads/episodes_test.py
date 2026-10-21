@@ -1,6 +1,6 @@
 import pytest
 
-from stremio_plus_plus.downloads.episodes import next_episode, parse_episode
+from stremio_plus_plus.downloads.episodes import next_episodes, parse_episode
 from stremio_plus_plus.server.models import Engine, TorrentFile
 
 
@@ -30,16 +30,32 @@ def test_next_episode_in_a_season_pack_ignores_samples_and_non_video() -> None:
         ("Show.S01E02.mkv", 100),
         ("Show.S01E02.nfo", 1),
     )
-    nxt = next_episode(engine, 0)
-    assert nxt is not None and nxt.index == 2
+    assert [f.index for f in next_episodes(engine, 0, 1)] == [2]
 
 
 def test_next_episode_rolls_over_to_the_next_season() -> None:
     engine = _engine(("Show.S01E10.mkv", 100), ("Show.S02E01.mkv", 100))
-    nxt = next_episode(engine, 0)
-    assert nxt is not None and nxt.name == "Show.S02E01.mkv"
+    assert [f.name for f in next_episodes(engine, 0, 1)] == ["Show.S02E01.mkv"]
 
 
 def test_no_next_episode_for_last_episode_or_movies() -> None:
-    assert next_episode(_engine(("Show.S01E10.mkv", 100)), 0) is None
-    assert next_episode(_engine(("Movie.2023.mkv", 100)), 0) is None
+    assert next_episodes(_engine(("Show.S01E10.mkv", 100)), 0, 1) == []
+    assert next_episodes(_engine(("Movie.2023.mkv", 100)), 0, 1) == []
+
+
+def test_n_episodes_or_the_rest_of_the_season() -> None:
+    engine = _engine(
+        ("Show.S01E03.mkv", 100),
+        ("Show.S01E01.mkv", 100),
+        ("Show.S01E02.mkv", 100),
+        ("Show.S01E04.mkv", 100),
+        ("Show.S02E01.mkv", 100),
+    )
+
+    def names(files: list[TorrentFile]) -> list[str]:
+        return [f.name[5:11] for f in files]
+
+    assert names(next_episodes(engine, 2, 2)) == ["S01E03", "S01E04"]
+    assert names(next_episodes(engine, 2, 5)) == ["S01E03", "S01E04", "S02E01"]
+    assert names(next_episodes(engine, 2, None)) == ["S01E03", "S01E04"]
+    assert next_episodes(engine, 2, 0) == []

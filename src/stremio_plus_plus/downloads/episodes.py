@@ -23,15 +23,24 @@ def _is_video(file: TorrentFile) -> bool:
     return file.name.lower().endswith(VIDEO_EXTENSIONS)
 
 
-def next_episode(engine: Engine, file_index: int) -> TorrentFile | None:
+def next_episodes(engine: Engine, file_index: int, count: int | None) -> list[TorrentFile]:
+    """The episodes after the playing one, in order: `count` of them (crossing into the next
+    season), or with `count=None` the rest of the current season."""
     current = engine.file(file_index)
     parsed = parse_episode(current.name) if current else None
-    if parsed is None:
-        return None
-    season, episode = parsed
-    # Largest file wins when a pack carries samples/extras with the same episode tag.
-    for key in ((season, episode + 1), (season + 1, 1)):
-        same = [f for f in engine.files if _is_video(f) and parse_episode(f.name) == key]
-        if same:
-            return max(same, key=lambda f: f.length)
-    return None
+    if parsed is None or count == 0:
+        return []
+    by_key: dict[tuple[int, int], tuple[tuple[int, int], TorrentFile]] = {}
+    for f in engine.files:
+        key = parse_episode(f.name) if _is_video(f) else None
+        # The largest file per episode: packs carry samples/extras with the same tag.
+        if (
+            key is not None
+            and key > parsed
+            and (key not in by_key or f.length > by_key[key][1].length)
+        ):
+            by_key[key] = (key, f)
+    later = [by_key[k] for k in sorted(by_key)]
+    if count is None:
+        return [f for (season, _), f in later if season == parsed[0]]
+    return [f for _, f in later[:count]]

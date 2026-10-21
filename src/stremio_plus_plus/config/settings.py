@@ -6,7 +6,7 @@ has a default, so a missing file or section means "the defaults", and an unknown
 """
 
 from ipaddress import IPv4Address
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -38,11 +38,21 @@ class SpeechSettings(_Section):
 class SubtitleSettings(_Section):
     translator: TranslatorSettings = TranslatorSettings()
     speech: SpeechSettings = SpeechSettings()
+    # Episodes after the playing one to generate whole, ahead of time (0 = off). Capped by
+    # downloads.next_episodes: the audio comes from the downloaded file.
+    next_episodes: int = Field(default=1, ge=0, le=20)
 
 
 class DownloadSettings(_Section):
     min_free_gb: float = Field(default=3.0, ge=0.5, le=10_000)
     stale_after_days: float = Field(default=7.0, ge=0.5, le=3650)
+    # Episodes after the playing one to download in advance, or "season": the rest of the season.
+    next_episodes: Annotated[int, Field(ge=0, le=50)] | Literal["season"] = 1
+
+    def lookahead(self, subtitles: int) -> tuple[int | None, int]:
+        """(episodes to download, None = rest of the season; episodes to subtitle ahead)."""
+        downloads = None if self.next_episodes == "season" else self.next_episodes
+        return downloads, subtitles if downloads is None else min(subtitles, downloads)
 
     @property
     def min_free_bytes(self) -> int:

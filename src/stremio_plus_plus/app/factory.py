@@ -85,6 +85,9 @@ def create_app(env: Env, settings_file: SettingsFile, host: HostInfo) -> FastAPI
                 lambda: free_bytes(cache_dir),
                 lambda: settings_file.settings.downloads.min_free_bytes,
                 subtitles.prepare_next,
+                lambda: settings_file.settings.downloads.lookahead(
+                    settings_file.settings.subtitles.next_episodes
+                ),
             )
             sessions = Sessions(env.companion_data_dir / "hls")
             # The activity feed hears HLS playback too (reported straight to these handlers).

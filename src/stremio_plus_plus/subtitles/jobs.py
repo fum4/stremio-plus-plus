@@ -126,8 +126,14 @@ class SubtitleJobs:
             job.wanted = True
             self._wake.set()
 
-    def prepare_next(
-        self, info_hash: str, playing_index: int, file_index: int, file_name: str, file_length: int
+    def prepare_next(  # the downloads' NextEpisodeHook
+        self,
+        info_hash: str,
+        playing_index: int,
+        file_index: int,
+        file_name: str,
+        file_length: int,
+        distance: int = 1,
     ) -> None:
         """The next episode of a file being watched with Romanian subtitles: generate all of it
         once the playing one is covered, so the TV's single load as it starts gets the whole
@@ -140,7 +146,7 @@ class SubtitleJobs:
         job.meta = self._store.file(info_hash, file_index)
         job.queued_ahead = True
         job.wanted = True
-        job.last_active = 0.0  # after every file actually being watched
+        job.last_active = -float(distance)  # after every file being watched, nearest first
         log.info("subtitles_queued_next_episode", file=file_name)
         self._wake.set()
 
