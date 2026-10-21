@@ -17,6 +17,28 @@ MIGRATIONS: tuple[str, ...] = (
         PRIMARY KEY (info_hash, file_index)
     );
     """,
+    """
+    CREATE TABLE subtitle_files (
+        info_hash     TEXT    NOT NULL,
+        file_index    INTEGER NOT NULL,
+        file_name     TEXT    NOT NULL,
+        file_length   INTEGER NOT NULL,
+        video_hash    TEXT,
+        duration_s    REAL    NOT NULL,
+        audio_stream  INTEGER NOT NULL,
+        center        INTEGER NOT NULL,
+        PRIMARY KEY (info_hash, file_index)
+    );
+    CREATE INDEX subtitle_files_by_video ON subtitle_files (video_hash, file_length);
+    CREATE TABLE subtitle_chunks (
+        info_hash   TEXT    NOT NULL,
+        file_index  INTEGER NOT NULL,
+        chunk_index INTEGER NOT NULL,
+        cues_json   TEXT    NOT NULL,
+        created_at  REAL    NOT NULL,
+        PRIMARY KEY (info_hash, file_index, chunk_index)
+    );
+    """,
 )
 
 
