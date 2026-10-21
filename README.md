@@ -38,7 +38,7 @@ Why it's built this way, with evidence from the server.js bundle: [docs/research
 ## Watching
 
 1. Play anything on the TV as usual.
-2. For Romanian subtitles: subtitles menu → **Romanian (AI)**. The first time a title plays, the first lines take ~30 s. If you see *"Se generează subtitrarea…"*, wait a minute and **select the track again**: each selection loads everything generated so far. On a resume or rewatch they're there immediately.
+2. For Romanian subtitles: subtitles menu → **Romanian (AI)**. The first time a title plays, the first 30 s of lines are generated from where you are and served within ~10 s on a well-seeded torrent (a slow one has to download the audio first). If you see *"Se generează subtitrarea…"*, wait a minute and **select the track again**: each selection loads everything generated so far. On a resume or rewatch they're there immediately.
 3. Pause as long as you like; the download continues.
 
 If the Mac is asleep or off, torrents won't play. Switch the TV back to its own server: [revert](docs/runbooks/tv-setup.md#4-revert).

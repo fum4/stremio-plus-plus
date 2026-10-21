@@ -2,6 +2,12 @@ LABEL = "Romanian (AI)"
 LANG = "ron"
 SAMPLE_RATE = 16000
 CHUNK_S = 120
+# Before the playhead's full chunk, generate just this much from the playhead: first lines in
+# seconds instead of after a whole chunk's audio has downloaded. Kept in memory, never stored.
+LEAD_IN_S = 30
+# A subtitle file request that finds nothing yet waits this long for the lead-in instead of
+# answering with the placeholder straight away (the player fetches once per track selection).
+FIRST_ANSWER_WAIT_S = 10.0
 OVERLAP_S = 2.0
 WHISPER_MODEL = "mlx-community/whisper-large-v3-turbo"
 TRANSLATE_MODEL = "claude-haiku-5-5"

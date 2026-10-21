@@ -5,6 +5,7 @@ thing the public HTTPS listener serves. `lan_router` (generated SRT) is fetched 
 server over the LAN, on the plain-http port only (https_guard.py).
 """
 
+import asyncio
 import secrets
 from typing import Any
 from urllib.parse import parse_qs
@@ -13,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 
 from stremio_plus_plus.app.services import Services
-from stremio_plus_plus.subtitles.constants import LABEL, LANG
+from stremio_plus_plus.subtitles.constants import FIRST_ANSWER_WAIT_S, LABEL, LANG
 from stremio_plus_plus.subtitles.cues import Cue, render_srt
 
 
@@ -77,7 +78,15 @@ async def subtitles(request: Request, kind: str, item_id: str, extra: str) -> di
 
 @lan_router.get("/srt/{info_hash}/{file_index}.srt", response_class=PlainTextResponse)
 async def srt(request: Request, info_hash: str, file_index: int) -> PlainTextResponse:
-    cues = _services(request).subtitle_store.cues(info_hash, file_index)
+    jobs = _services(request).subtitles
+    cues = jobs.cues(info_hash, file_index)
+    waited = 0.0
+    # The player fetches this once per track selection: a few seconds' wait for the lead-in
+    # beats a placeholder the viewer has to re-select past.
+    while not cues and jobs.generating(info_hash, file_index) and waited < FIRST_ANSWER_WAIT_S:
+        await asyncio.sleep(0.5)
+        waited += 0.5
+        cues = jobs.cues(info_hash, file_index)
     return PlainTextResponse(
         render_srt(cues or PLACEHOLDER), media_type="application/x-subrip; charset=utf-8"
     )

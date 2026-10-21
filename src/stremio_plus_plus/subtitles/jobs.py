@@ -11,6 +11,7 @@ from stremio_plus_plus.server.client import StremioServer
 from stremio_plus_plus.subtitles import audio
 from stremio_plus_plus.subtitles.constants import (
     CHUNK_S,
+    LEAD_IN_S,
     MAX_CHUNK_FAILURES,
     OVERLAP_S,
     RETRY_FAILED_AFTER_S,
@@ -41,6 +42,10 @@ class _Job:
     failures: dict[int, int] = field(default_factory=dict[int, int])
     dead: bool = False
     failed_at: float = 0.0
+    lead_ins: dict[int, list[Cue]] = field(default_factory=dict[int, list[Cue]])
+
+    def playhead_s(self) -> float:
+        return self.playhead_fraction * (self.meta.duration_s if self.meta else 0.0)
 
 
 class SubtitleJobs:
@@ -74,6 +79,20 @@ class SubtitleJobs:
         job.last_active = now
         self._wake.set()
 
+    def cues(self, info_hash: str, file_index: int) -> list[Cue]:
+        """Stored cues, plus the lead-in of any chunk still being generated."""
+        stored = self._store.cues(info_hash, file_index)
+        job = self._jobs.get((info_hash, file_index))
+        if job is None or not job.lead_ins:
+            return stored
+        done = self._store.done_chunks(info_hash, file_index)
+        extra = [c for i, cues in job.lead_ins.items() if i not in done for c in cues]
+        return sorted(stored + extra, key=lambda c: c.start)
+
+    def generating(self, info_hash: str, file_index: int) -> bool:
+        job = self._jobs.get((info_hash, file_index))
+        return job is not None and not job.dead
+
     async def __call__(self, event: Event) -> None:
         if not isinstance(event, FileRequested):
             return
@@ -86,7 +105,7 @@ class SubtitleJobs:
 
     async def run(self) -> None:
         while True:
-            job, chunk = self._pick()
+            job, chunk, lead_in = self._pick()
             if job is None:
                 self._wake.clear()
                 await self._wake.wait()
@@ -94,6 +113,8 @@ class SubtitleJobs:
             try:
                 if job.meta is None:
                     await self._prepare(job)
+                elif chunk is not None and lead_in:
+                    await self._generate_lead_in(job, chunk)
                 elif chunk is not None:
                     await self._generate(job, chunk)
             except Exception:  # one bad chunk or file must not stop subtitles for everything else
@@ -104,20 +125,20 @@ class SubtitleJobs:
                 else:
                     job.failures[chunk] = job.failures.get(chunk, 0) + 1
 
-    def _pick(self) -> tuple[_Job | None, int | None]:
+    def _pick(self) -> tuple[_Job | None, int | None, bool]:
         for job in sorted(self._jobs.values(), key=lambda j: j.last_active, reverse=True):
             if job.dead:
                 continue
             if job.meta is None:
-                return job, None
+                return job, None, False
             done = self._store.done_chunks(job.info_hash, job.file_index)
             skipped = {i for i, n in job.failures.items() if n >= MAX_CHUNK_FAILURES}
             total = chunk_count(job.meta.duration_s, CHUNK_S)
-            playhead_s = job.playhead_fraction * job.meta.duration_s
-            chunk = next_chunk(done | skipped, total, int(playhead_s // CHUNK_S))
+            playhead_chunk = int(job.playhead_s() // CHUNK_S)
+            chunk = next_chunk(done | skipped, total, playhead_chunk)
             if chunk is not None:
-                return job, chunk
-        return None, None
+                return job, chunk, chunk == playhead_chunk and chunk not in job.lead_ins
+        return None, None, False
 
     async def _prepare(self, job: _Job) -> None:
         # Hash computed by the server from the file itself: a client-supplied hash could make
@@ -163,35 +184,48 @@ class SubtitleJobs:
             center=track.center,
         )
 
-    async def _generate(self, job: _Job, chunk: int) -> None:
+    async def _romanian(self, job: _Job, start_s: float, end_s: float) -> list[Cue]:
+        """Cues starting in [start_s, end_s), transcribed and translated."""
         assert job.meta is not None
-        t0 = self._clock()
-        window_start = max(0.0, chunk * CHUNK_S - OVERLAP_S)
+        window_start = max(0.0, start_s - OVERLAP_S)
         track = audio.AudioTrack(job.meta.audio_stream, job.meta.center, job.meta.duration_s)
         samples = await audio.read_chunk(
             self._server.file_url(job.info_hash, job.file_index),
             track,
             window_start,
-            CHUNK_S + OVERLAP_S,
+            end_s - window_start,
         )
         heard = await self._stt.transcribe(samples, window_start)
-        own = [c for c in heard if chunk * CHUNK_S <= c.start < (chunk + 1) * CHUNK_S]
+        own = [c for c in heard if start_s <= c.start < end_s]
         context = [
-            c.text
-            for c in self._store.cues(job.info_hash, job.file_index)
-            if c.start < chunk * CHUNK_S
+            c.text for c in self._store.cues(job.info_hash, job.file_index) if c.start < start_s
         ]
         romanian = await self._translator.translate([c.text for c in own], context)
-        self._store.save_chunk(
-            job.info_hash,
-            job.file_index,
-            chunk,
-            [Cue(c.start, c.end, ro) for c, ro in zip(own, romanian, strict=True)],
+        return [Cue(c.start, c.end, ro) for c, ro in zip(own, romanian, strict=True)]
+
+    async def _generate_lead_in(self, job: _Job, chunk: int) -> None:
+        job.lead_ins[chunk] = []  # attempted: a failure falls through to the full chunk
+        t0 = self._clock()
+        start = max(float(chunk * CHUNK_S), job.playhead_s())
+        end = min(start + LEAD_IN_S, (chunk + 1) * CHUNK_S)
+        job.lead_ins[chunk] = await self._romanian(job, start, end)
+        log.info(
+            "subtitle_lead_in",
+            file=job.file_name,
+            chunk=chunk,
+            cues=len(job.lead_ins[chunk]),
+            seconds=round(self._clock() - t0, 1),
         )
+
+    async def _generate(self, job: _Job, chunk: int) -> None:
+        t0 = self._clock()
+        cues = await self._romanian(job, float(chunk * CHUNK_S), float((chunk + 1) * CHUNK_S))
+        self._store.save_chunk(job.info_hash, job.file_index, chunk, cues)
+        job.lead_ins.pop(chunk, None)
         log.info(
             "subtitle_chunk",
             file=job.file_name,
             chunk=chunk,
-            cues=len(own),
+            cues=len(cues),
             seconds=round(self._clock() - t0, 1),
         )

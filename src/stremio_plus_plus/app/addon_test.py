@@ -1,11 +1,14 @@
+import time
 from ipaddress import IPv4Address
 from pathlib import Path
 
 import httpx
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import AnyHttpUrl
 
+from stremio_plus_plus.app import addon
 from stremio_plus_plus.app.addon import addon_router, lan_router
 from stremio_plus_plus.app.services import Services
 from stremio_plus_plus.config.env import Env
@@ -35,6 +38,11 @@ class _NoStt:
 
 
 def _client(tmp_path: Path) -> tuple[TestClient, SubtitleStore]:
+    client, store, _ = _client_and_jobs(tmp_path)
+    return client, store
+
+
+def _client_and_jobs(tmp_path: Path) -> tuple[TestClient, SubtitleStore, SubtitleJobs]:
     env = Env(
         stremio_server_url=AnyHttpUrl("http://srv:11470"),
         stremio_server_log=tmp_path / "server.log",
@@ -57,6 +65,7 @@ def _client(tmp_path: Path) -> tuple[TestClient, SubtitleStore]:
     db = open_db(tmp_path / "s.db")
     store = SubtitleStore(db)
     pinner = Pinner(http, server)
+    jobs = SubtitleJobs(server, store, _NoStt(), ClaudeCliTranslator(Path("/bin/false")))
     app = FastAPI()
     app.include_router(addon_router)
     app.include_router(lan_router)
@@ -69,9 +78,9 @@ def _client(tmp_path: Path) -> tuple[TestClient, SubtitleStore]:
         pinner=pinner,
         downloads=DownloadManager(server, pinner, lambda: 0),
         subtitle_store=store,
-        subtitles=SubtitleJobs(server, store, _NoStt(), ClaudeCliTranslator(Path("/bin/false"))),
+        subtitles=jobs,
     )
-    return TestClient(app), store
+    return TestClient(app), store, jobs
 
 
 def test_manifest_names_the_addon_stremio_plus_plus(tmp_path: Path) -> None:
@@ -101,6 +110,17 @@ def test_srt_serves_stored_cues_or_a_placeholder(tmp_path: Path) -> None:
     assert "Se generează" in client.get(f"/srt/{IH}/0.srt").text
     store.save_chunk(IH, 0, 0, [Cue(1.0, 2.0, "Unu")])
     assert client.get(f"/srt/{IH}/0.srt").text == "1\n00:00:01,000 --> 00:00:02,000\nUnu\n"
+
+
+def test_srt_waits_a_bounded_time_for_a_file_being_generated(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(addon, "FIRST_ANSWER_WAIT_S", 1.0)
+    client, _, jobs = _client_and_jobs(tmp_path)
+    jobs.ensure(IH, 0, "MobLand.S01E03.mkv", 3560556831)  # nothing generated yet
+    t0 = time.monotonic()
+    assert "Se generează" in client.get(f"/srt/{IH}/0.srt").text
+    assert 1.0 <= time.monotonic() - t0 < 3.0
 
 
 def test_wrong_token_is_404(tmp_path: Path) -> None:
