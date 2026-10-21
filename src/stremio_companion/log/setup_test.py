@@ -27,3 +27,14 @@ def test_level_filters_lower_events(capsys: pytest.CaptureFixture[str]) -> None:
     configure_logging(level="WARNING", fmt="json")
     structlog.get_logger().info("dropped")
     assert capsys.readouterr().err == ""
+
+
+def test_json_includes_the_exception(capsys: pytest.CaptureFixture[str]) -> None:
+    configure_logging(level="INFO", fmt="json")
+    try:
+        raise FileNotFoundError("ffprobe")
+    except FileNotFoundError:
+        structlog.get_logger().exception("failed")
+    line = json.loads(capsys.readouterr().err.splitlines()[-1])
+    assert line["event"] == "failed"
+    assert line["exception"][0]["exc_type"] == "FileNotFoundError"

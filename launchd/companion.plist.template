@@ -9,6 +9,9 @@
     <string>@MISE@</string><string>exec</string><string>--cd</string><string>@REPO@</string>
     <string>--</string><string>python</string><string>-m</string><string>stremio_companion</string>
   </array>
+  <!-- launchd's PATH is /usr/bin:/bin only: ffmpeg/ffprobe live in Homebrew. -->
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
   <key>RunAtLoad</key><true/>
   <!-- Restart on crash only; a clean exit stays down. -->
   <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
