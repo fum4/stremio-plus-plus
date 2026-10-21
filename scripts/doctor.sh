@@ -51,8 +51,12 @@ else
 fi
 resolved="$(dig +short "$ADDON_DOMAIN" @1.1.1.1 | tail -1)"
 [ "$resolved" = "${HOST_LAN_IP:-}" ] && ok "$ADDON_DOMAIN → $resolved (this host)" || bad "$ADDON_DOMAIN → ${resolved:-nothing}, not ${HOST_LAN_IP:-?}" "update the stremio record in Nomadware.io infra/terraform/records.tf"
-code="$(curl -s -o /dev/null -w '%{http_code}' -m5 "https://$ADDON_DOMAIN:$ADDON_HTTPS_PORT/${ADDON_TOKEN:-x}/manifest.json")"
+# --resolve: test the service itself, independent of this Mac's resolver cache (Tailscale MagicDNS
+# can hold a stale answer for a while after DNS changes).
+code="$(curl -s -o /dev/null -w '%{http_code}' -m5 --resolve "$ADDON_DOMAIN:$ADDON_HTTPS_PORT:${resolved:-127.0.0.1}" "https://$ADDON_DOMAIN:$ADDON_HTTPS_PORT/${ADDON_TOKEN:-x}/manifest.json")"
 [ "$code" = 200 ] && ok "addon answers over HTTPS (mise run addon:url for the install URL)" || bad "addon over HTTPS returned ${code}" "mise run services:restart companion; companion.log"
+local_answer="$(dig +short "$ADDON_DOMAIN" | tail -1)"
+[ "$local_answer" = "$resolved" ] || warn "this Mac's resolver answers '${local_answer:-nothing}' for $ADDON_DOMAIN" "stale cache (Tailscale MagicDNS); clears on its own, or: sudo killall -HUP mDNSResponder"
 launchctl print "gui/$(id -u)/io.github.fum4.stremio-companion.tls" >/dev/null 2>&1 && ok "weekly certificate renewal agent loaded" || bad "tls agent missing" "mise run services:install tls"
 
 echo "TV"
