@@ -84,13 +84,18 @@ run = "python -m stremio_companion.downloads.cleanup_job"
 description = "Download the Whisper model (~1.6 GB, once per machine) into the Hugging Face cache"
 run = "python -c 'from huggingface_hub import snapshot_download; from stremio_companion.subtitles.constants import WHISPER_MODEL; print(snapshot_download(WHISPER_MODEL))'"
 
+[tasks.tv]
+description = "Control the TV from this host: pair | status | key KEY_X... | text '<string>' (mise run tv -- pair)"
+run = "python -m stremio_companion.tv.cli"
+
 [tasks."host:promote"]
-description = "Make this Mac the Stremio host: setup, Whisper model, all launchd agents, then the doctor (devbox `onboard`)"
+description = "Make this Mac the Stremio host: setup, Whisper model, launchd agents, pair with the TV (press Allow), then the doctor (devbox `onboard`)"
 alias = "onboard"
 run = [
   "mise run setup",
   "mise run models:fetch",
   "mise run services:install",
+  "python -m stremio_companion.tv.cli status || python -m stremio_companion.tv.cli pair",
   "scripts/doctor.sh",
 ]
 

@@ -24,6 +24,7 @@ class Env(BaseSettings):
     companion_port: int = Field(ge=1, le=65535)
     companion_data_dir: Path
     host_lan_ip: IPv4Address
+    tv_host: IPv4Address
     claude_cli: Path
     log_level: LogLevel
     log_format: LogFormat

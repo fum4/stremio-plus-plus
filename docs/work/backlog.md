@@ -18,8 +18,12 @@ Prefetch only works inside one torrent (season packs). Single-episode torrents w
 ## Server log holds the Stremio authKey in plain text · 2026-10-21 · S
 server.js logs `GET /get-https?authKey=…` to `~/Library/Logs/stremio-companion/server.log`. First step: create the log dir 0700 / file 0600 in `launchd-install.sh`, and add rotation (newsyslog conf in the repo) so it doesn't grow forever.
 
-## Permanent TV remote control from Batman · 2026-10-21 · M
+## ~~Permanent TV remote control from Batman~~ done 2026-10-21 (src/stremio_companion/tv); follow-up below · 2026-10-21 · M
 Owner wants Batman to control the TV for good (typing URLs with the remote is painful). Proven in phase 0: Samsung WS API `wss://192.168.1.134:8002/api/v2/channels/samsung.remote.control` paired after one on-TV "Allow"; the TV sends `ms.remote.touchDisable/Enable` before `ms.channel.connect`, which `samsungtvws` 3.0.6 treats as failure → own small client. First step: a `tv/` package (pair, key, text, power via Wake-on-LAN) + `mise run tv -- …`; the pairing token is a credential → `secrets/*.age` once the macOS repo-secrets decision lands.
 
 ## Secret token in the addon URL · 2026-10-21 · S
 The addon (manifest, subtitle list, SRT) is unauthenticated; through a public HTTPS front anyone with the URL can make the companion generate subtitles for files already cached (burns Claude quota, capped at 120 calls/h). First step, with the `nomadware.io` setup: serve the addon under `/<token>/…` (token = an `env` row in `secrets/`), reject everything else at the HTTPS front, then reinstall the addon once. Also keep the private LAN IP out of public responses where possible.
+
+
+## Set the TV's server URL automatically on host:promote · 2026-10-21 · M
+TV control works (pair/keys/text), but reaching Stremio → Settings → Streaming → server URL is a menu path we haven't mapped. First step: with the owner watching, record the key sequence from the Theater home screen, add `mise run tv -- set-server-url`, and call it from `host:promote` so a takeover needs no TV interaction at all.

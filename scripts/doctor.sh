@@ -40,6 +40,10 @@ fi
 curl -sf -m3 "http://127.0.0.1:$COMPANION_PORT/health" >/dev/null && ok "companion up (:$COMPANION_PORT)" || bad "companion down" "mise run services:install companion; logs: ~/Library/Logs/stremio-companion/companion.log"
 launchctl print "gui/$(id -u)/io.github.fum4.stremio-companion.cleanup" >/dev/null 2>&1 && ok "daily cleanup agent loaded" || bad "cleanup agent missing" "mise run services:install cleanup"
 
+echo "TV"
+if nc -z -G 3 "$TV_HOST" 8002 2>/dev/null; then ok "TV reachable ($TV_HOST)"; else warn "TV not reachable at $TV_HOST" "TV off/asleep, or its IP changed (TV_HOST in infra/env/companion.env)"; fi
+python -m stremio_companion.tv.cli status >/dev/null 2>&1 && ok "this host is paired with the TV" || bad "not paired with the TV" "mise run tv -- pair (press Allow on the TV)"
+
 echo "Data"
 if python -c 'from huggingface_hub import try_to_load_from_cache as t; from stremio_companion.subtitles.constants import WHISPER_MODEL as m; import sys; sys.exit(0 if isinstance(t(m, "config.json"), str) else 1)' 2>/dev/null; then
   ok "Whisper model cached"
