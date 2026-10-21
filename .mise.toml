@@ -76,6 +76,23 @@ run = "python -m stremio_companion.downloads.cleanup_job"
 description = "Download the Whisper model (~1.6 GB, once per machine) into the Hugging Face cache"
 run = "python -c 'from huggingface_hub import snapshot_download; from stremio_companion.subtitles.constants import WHISPER_MODEL; print(snapshot_download(WHISPER_MODEL))'"
 
+[tasks.onboard]
+description = "One-time human onboarding of a new host: setup, Whisper model, all launchd agents, then the doctor"
+run = [
+  "mise run setup",
+  "mise run models:fetch",
+  "mise run install-service",
+  "scripts/doctor.sh",
+]
+
+[tasks.doctor]
+description = "Read-only health check of this host (tools, Claude login, LAN IP, services, model, disk)"
+run = "scripts/doctor.sh"
+
+[tasks.tunnel]
+description = "TEMPORARY HTTPS front for the addon (Cloudflare quick tunnel; new URL every run → reinstall the addon). Replaced by nomadware.io"
+run = "cloudflared tunnel --no-autoupdate --url http://127.0.0.1:${COMPANION_PORT}"
+
 [tasks.dev]
 description = "Run the companion in the foreground with reload"
 run = "uv run python -m stremio_companion"
