@@ -37,8 +37,8 @@ if curl -sf -m3 "$STREMIO_SERVER_URL/settings" >/dev/null; then
 else
   bad "streaming server down" "mise run services:install server"
 fi
-curl -sf -m3 "http://127.0.0.1:$COMPANION_PORT/health" >/dev/null && ok "companion up (:$COMPANION_PORT)" || bad "companion down" "mise run services:install companion; logs: ~/Library/Logs/stremio-companion/companion.log"
-launchctl print "gui/$(id -u)/io.github.fum4.stremio-companion.cleanup" >/dev/null 2>&1 && ok "daily cleanup agent loaded" || bad "cleanup agent missing" "mise run services:install cleanup"
+curl -sf -m3 "http://127.0.0.1:$COMPANION_PORT/health" >/dev/null && ok "companion up (:$COMPANION_PORT)" || bad "companion down" "mise run services:install companion; logs: ~/Library/Logs/stremio-plus-plus/companion.log"
+launchctl print "gui/$(id -u)/io.github.fum4.stremio-plus-plus.cleanup" >/dev/null 2>&1 && ok "daily cleanup agent loaded" || bad "cleanup agent missing" "mise run services:install cleanup"
 
 echo "Addon (HTTPS)"
 cert="${COMPANION_DATA_DIR/#\~/$HOME}/tls/certificates/$ADDON_DOMAIN.crt"
@@ -57,14 +57,14 @@ code="$(curl -s -o /dev/null -w '%{http_code}' -m5 --resolve "$ADDON_DOMAIN:$ADD
 [ "$code" = 200 ] && ok "addon answers over HTTPS (mise run addon:url for the install URL)" || bad "addon over HTTPS returned ${code}" "mise run services:restart companion; companion.log"
 local_answer="$(dig +short "$ADDON_DOMAIN" | tail -1)"
 [ "$local_answer" = "$resolved" ] || warn "this Mac's resolver answers '${local_answer:-nothing}' for $ADDON_DOMAIN" "stale cache (Tailscale MagicDNS); clears on its own, or: sudo killall -HUP mDNSResponder"
-launchctl print "gui/$(id -u)/io.github.fum4.stremio-companion.tls" >/dev/null 2>&1 && ok "weekly certificate renewal agent loaded" || bad "tls agent missing" "mise run services:install tls"
+launchctl print "gui/$(id -u)/io.github.fum4.stremio-plus-plus.tls" >/dev/null 2>&1 && ok "weekly certificate renewal agent loaded" || bad "tls agent missing" "mise run services:install tls"
 
 echo "TV"
 if nc -z -G 3 "$TV_HOST" 8002 2>/dev/null; then ok "TV reachable ($TV_HOST)"; else warn "TV not reachable at $TV_HOST" "TV off/asleep, or its IP changed (TV_HOST in infra/env/companion.env)"; fi
-python -m stremio_companion.tv.cli status >/dev/null 2>&1 && ok "this host is paired with the TV" || bad "not paired with the TV" "mise run tv -- pair (press Allow on the TV)"
+python -m stremio_plus_plus.tv.cli status >/dev/null 2>&1 && ok "this host is paired with the TV" || bad "not paired with the TV" "mise run tv -- pair (press Allow on the TV)"
 
 echo "Data"
-if python -c 'from huggingface_hub import try_to_load_from_cache as t; from stremio_companion.subtitles.constants import WHISPER_MODEL as m; import sys; sys.exit(0 if isinstance(t(m, "config.json"), str) else 1)' 2>/dev/null; then
+if python -c 'from huggingface_hub import try_to_load_from_cache as t; from stremio_plus_plus.subtitles.constants import WHISPER_MODEL as m; import sys; sys.exit(0 if isinstance(t(m, "config.json"), str) else 1)' 2>/dev/null; then
   ok "Whisper model cached"
 else
   bad "Whisper model not downloaded" "mise run models:fetch"

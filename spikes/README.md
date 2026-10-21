@@ -3,7 +3,7 @@
 Code written during spikes to answer a question, kept for the record (owner's call, 2026-10-21). **Not production code**: no tests, not linted/type-checked (excluded in `pyproject.toml`), never imported by `src/`. Each feature that graduates gets a proper implementation under `src/` and the spike is deleted in the same PR.
 
 ## `phase-0/` (2026-10-21, results in `docs/research/phase-0-results.md`)
-Graduated and deleted (in git history): `live_ro.py` → `src/stremio_companion/subtitles/`, `tvctl.py` → `src/stremio_companion/tv/`.
+Graduated and deleted (in git history): `live_ro.py` → `src/stremio_plus_plus/subtitles/`, `tvctl.py` → `src/stremio_plus_plus/tv/`.
 
 | File | Answered |
 |---|---|

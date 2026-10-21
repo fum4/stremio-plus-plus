@@ -3,7 +3,7 @@
 <!-- Stremio streaming server (pinned server.js under mise-pinned node). Rendered by `mise run services:install`. -->
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>io.github.fum4.stremio-companion.server</string>
+  <key>Label</key><string>io.github.fum4.stremio-plus-plus.server</string>
   <key>ProgramArguments</key>
   <array>
     <string>@MISE@</string><string>exec</string><string>--cd</string><string>@REPO@</string>
@@ -12,14 +12,14 @@
   <key>EnvironmentVariables</key>
   <dict>
     <!-- Own settings + cache dir, so a Stremio desktop install never shares (or trims) it. -->
-    <key>APP_PATH</key><string>@HOME@/Library/Application Support/stremio-companion/stremio-server</string>
+    <key>APP_PATH</key><string>@HOME@/Library/Application Support/stremio-plus-plus/stremio-server</string>
     <key>FFMPEG_BIN</key><string>/opt/homebrew/bin/ffmpeg</string>
     <key>FFPROBE_BIN</key><string>/opt/homebrew/bin/ffprobe</string>
   </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>ThrottleInterval</key><integer>10</integer>
-  <key>StandardOutPath</key><string>@HOME@/Library/Logs/stremio-companion/server.log</string>
-  <key>StandardErrorPath</key><string>@HOME@/Library/Logs/stremio-companion/server.log</string>
+  <key>StandardOutPath</key><string>@HOME@/Library/Logs/stremio-plus-plus/server.log</string>
+  <key>StandardErrorPath</key><string>@HOME@/Library/Logs/stremio-plus-plus/server.log</string>
 </dict>
 </plist>

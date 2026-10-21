@@ -2,7 +2,7 @@
 import json, re, subprocess, time, urllib.request
 from pathlib import Path
 
-LOG = Path.home() / "Library/Logs/stremio-companion/server.log"
+LOG = Path.home() / "Library/Logs/stremio-plus-plus/server.log"
 BASE = "http://127.0.0.1:11470"
 
 def get(path):

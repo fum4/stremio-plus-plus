@@ -7,7 +7,7 @@ set -euo pipefail
 tls_dir="${COMPANION_DATA_DIR/#\~/$HOME}/tls"
 mkdir -p "$tls_dir" && chmod 700 "$tls_dir"
 # The companion may not be installed yet (first run in host:promote): a failed restart is fine.
-restart="sh -c 'launchctl kickstart -k gui/$(id -u)/io.github.fum4.stremio-companion.companion || true'"
+restart="sh -c 'launchctl kickstart -k gui/$(id -u)/io.github.fum4.stremio-plus-plus.companion || true'"
 # Public resolvers for the propagation check: the system resolver may be Tailscale's MagicDNS
 # (100.100.100.100), which can serve stale answers.
 lego run --accept-tos --dns cloudflare --dns.resolvers 1.1.1.1:53 --dns.resolvers 8.8.8.8:53 \

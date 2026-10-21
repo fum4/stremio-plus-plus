@@ -1,7 +1,7 @@
-# stremio-companion phase-0 benchmarks
+# stremio++ phase-0 benchmarks
 
 Run date: 2026-10-21 (local, ~01:30-01:50). Machine: "Batman".
-Scratch: `/tmp/stremio-companion-bench/` (repo untouched).
+Scratch: `/tmp/stremio-plus-plus-bench/` (repo untouched).
 
 ## Environment
 
@@ -20,7 +20,7 @@ Scratch: `/tmp/stremio-companion-bench/` (repo untouched).
 | whisper model | mlx-community/whisper-large-v3-turbo @ a4aaeec0 (weights.safetensors 1,613,977,612 B), fp16 |
 | jiwer | 4.0.0 (used to cross-check WER; a separate Levenshtein script gives the same numbers) |
 
-Isolation: every uv and HF download went to the scratch dir (`UV_CACHE_DIR=/tmp/stremio-companion-bench/uvcache`, `HF_HOME=/tmp/stremio-companion-bench/hf`). This made cleanup exact: `~/.cache/uv` stayed at 79M, and `~/.cache/huggingface` was never created.
+Isolation: every uv and HF download went to the scratch dir (`UV_CACHE_DIR=/tmp/stremio-plus-plus-bench/uvcache`, `HF_HOME=/tmp/stremio-plus-plus-bench/hf`). This made cleanup exact: `~/.cache/uv` stayed at 79M, and `~/.cache/huggingface` was never created.
 
 ## Test material
 
@@ -170,7 +170,7 @@ Window slicing cuts words at cue boundaries, so a trailing or leading fragment (
 - With huggingface-hub 2.2.0, HF downloads go to a shared `hub/blobs/` directory, not inside `models--*/blobs`. Deleting `models--mlx-community--parakeet-tdt-0.6b-v3` alone freed nothing, and free space fell to 3.8 GiB before the mistake was caught. Deleting `hub/blobs` fixed it. Free space never went below 3 GiB.
 - Disk free at the start was 7.5 GiB, not the expected ~9.6 GiB.
 
-## Files kept in /tmp/stremio-companion-bench/
+## Files kept in /tmp/stremio-plus-plus-bench/
 
 - `out/reference_TOS-en.srt`, `out/broken_*.srt`, `out/ffsubsync_*.srt`
 - `out/parakeet_run{1,2}/` (srt/vtt/txt/json; run1 and run2 SRTs are identical), `out/parakeet_subtitle_style/`

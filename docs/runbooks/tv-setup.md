@@ -45,7 +45,7 @@ How it reaches the Mac: `stremio.nomadware.io` is a public DNS name for the Mac'
 Each host pairs with the TV once (`mise run host:promote` does it; manually: `mise run tv -- pair`, then press **Allow** on the TV). The token is stored on the host (`<data dir>/tv-token`, mode 600), never in git; a new host pairs itself. Then:
 - `mise run tv -- text '<string>'` types into the focused on-screen keyboard (server URL, addon search…).
 - `mise run tv -- key KEY_HOME KEY_DOWN KEY_ENTER …` sends remote keys.
-- Revoke: TV Settings → General → External Device Manager → Device Connection Manager → Device List → remove *stremio-companion*.
+- Revoke: TV Settings → General → External Device Manager → Device Connection Manager → Device List → remove *stremio++*.
 
 The TV is at `TV_HOST` (`infra/env/companion.env`); give it a DHCP reservation too (Wi-Fi MAC `d0:c2:4e:13:e0:49`).
 

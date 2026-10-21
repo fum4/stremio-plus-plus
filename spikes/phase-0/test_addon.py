@@ -5,7 +5,7 @@ from urllib.parse import unquote
 
 HOST_IP, PORT = sys.argv[1], int(sys.argv[2])
 MANIFEST = {
-    "id": "io.github.fum4.stremio-companion.phase0", "version": "0.0.1",
+    "id": "io.github.fum4.stremio-plus-plus.phase0", "version": "0.0.1",
     "name": "Companion phase-0 test", "description": "Plain-http subtitle test (temporary)",
     "resources": ["subtitles"], "types": ["movie", "series"], "idPrefixes": ["tt", "kitsu"],
     "catalogs": [],

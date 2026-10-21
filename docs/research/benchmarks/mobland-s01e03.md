@@ -14,9 +14,9 @@ Source: live torrent streamed by the local Stremio server
 | ffsubsync | 0.5.1 |
 | mlx-whisper | 0.4.3 (mlx 0.32.4, huggingface-hub 2.2.0, numpy 2.5.4, torch 2.14.1, tiktoken 0.14.0) |
 | model | mlx-community/whisper-large-v3-turbo @ a4aaeec0636e6fef84abdcbe3544cb2bf7e9f6fb (1.5 GB on disk) |
-| scoring | /tmp/stremio-companion-stt/scripts/score.py (stdlib only, system python3 -I) |
+| scoring | /tmp/stremio-plus-plus-stt/scripts/score.py (stdlib only, system python3 -I) |
 
-Environment: `UV_CACHE_DIR=/tmp/stremio-companion-stt/uvcache HF_HOME=/tmp/stremio-companion-stt/hf`.
+Environment: `UV_CACHE_DIR=/tmp/stremio-plus-plus-stt/uvcache HF_HOME=/tmp/stremio-plus-plus-stt/hf`.
 
 ## 1. Probe and audio extraction
 ffprobe result: matroska. Container start_time **0.000**, duration 2833.70 s.
@@ -140,7 +140,7 @@ Common substitution classes in both: "gonna" vs "going to" (the reference normal
 5. Partial-torrent reads: audio-only `-t 600` was instant. Mixing subtitle outputs caused an indefinite stall that `-rw_timeout` did not catch, so a wall-clock watchdog is needed.
 
 ## Files (kept)
-- `/tmp/stremio-companion-stt/mobland-s01e03-first10min.en.srt` – best STT (centre)
-- `/tmp/stremio-companion-stt/reference-os13056791-synced-0-600.en.srt` – reference used
+- `/tmp/stremio-plus-plus-stt/mobland-s01e03-first10min.en.srt` – best STT (centre)
+- `/tmp/stremio-plus-plus-stt/reference-os13056791-synced-0-600.en.srt` – reference used
 - `out/` – all STT SRT/JSON/logs and score outputs; `subs/` – candidates, ffsubsync outputs and logs; `scripts/` – srtlib.py, score.py, env.sh
 - WAVs deleted. Per the coordinator's change of plan, HF_HOME (model) and the uv cache/env were **kept** for the follow-up test.

@@ -1,8 +1,8 @@
 # Shared by launchd-install.sh / launchd-uninstall.sh. Service name = template basename.
 REPO_ROOT="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 AGENTS_DIR="$HOME/Library/LaunchAgents"
-LOG_DIR="$HOME/Library/Logs/stremio-companion"
-LABEL_PREFIX="io.github.fum4.stremio-companion"
+LOG_DIR="$HOME/Library/Logs/stremio-plus-plus"
+LABEL_PREFIX="io.github.fum4.stremio-plus-plus"
 
 service_label() { echo "$LABEL_PREFIX.$1"; }
 

@@ -1,4 +1,4 @@
-# Proposal: make stremio-companion usable by anyone (self-hosted, configurable)
+# Proposal: make stremio++ usable by anyone (self-hosted, configurable)
 
 Status: **proposal** (2026-10-21), for the owner's decision. Nothing here is built yet.
 
@@ -23,21 +23,21 @@ self-hosts; the project ships software, not a service.
 | TV control | Samsung Tizen WS, `TV_HOST` committed | optional plugins: `samsung-tizen` · later `lg-webos`, `android-tv` (adb) · `none` |
 | Secrets | devbox `repo-secrets` + age key | secrets backend: OS keychain (macOS Keychain / libsecret) by default, env file (mode 600) for Docker, `repo-secrets` kept for the owner's own deployment |
 | Identity strings | `io.github.fum4.*` labels, Batman, `fum4/devbox` engine | neutral names; owner-specific bits move to the owner's deployment profile |
-| Config location | `infra/env/companion.env` + `.env.local` in the repo | one user config file outside the repo: `~/.config/stremio-companion/config.toml` (XDG; `%APPDATA%` later) |
+| Config location | `infra/env/companion.env` + `.env.local` in the repo | one user config file outside the repo: `~/.config/stremio-plus-plus/config.toml` (XDG; `%APPDATA%` later) |
 
 Already generic: download manager (prefetch, cleanup), playhead-first generation, subtitle store, server.js
 pinning (downloaded from Stremio at install time, never redistributed), tracker, doctor, HTTPS guard + token.
 
 ## Shape of the product
 ```
-stremio-companion (public repo, MIT/Apache-2.0)
+stremio++ (public repo, MIT/Apache-2.0)
   ├─ core           tracker, downloads, subtitle pipeline, addon, store   (unchanged, generic)
   ├─ providers/     translate/{claude_cli, anthropic, openai_compat, none}
   │                 stt/{mlx_whisper, faster_whisper, whisper_cpp, openai}
   │                 tls/{own_domain, tailscale_funnel, cloudflare_tunnel, lan_http}
   │                 tv/{samsung_tizen, …}   secrets/{keychain, envfile, repo_secrets}
   ├─ host/          launchd/, systemd/, docker/ (compose: server.js + companion)
-  └─ cli            `stremio-companion setup | doctor | status | addon-url | promote | demote`
+  └─ cli            `stremio-plus-plus setup | doctor | status | addon-url | promote | demote`
 config.toml  ←  written by `setup` (a wizard: asks only what it can't detect)
 ```
 Each provider = one small class behind a `Protocol` (already the pattern: `Transcriber`, `Translator`);
@@ -45,7 +45,7 @@ config picks it by name. Capability checks in `doctor` (e.g. "mlx-whisper needs 
 
 ## Install paths (in order of effort)
 1. **Clone + `mise run setup`** (today's flow, generalised): works now for technical users.
-2. **Homebrew tap** `brew install fum4/tap/stremio-companion` → `stremio-companion setup`: the wizard
+2. **Homebrew tap** `brew install fum4/tap/stremio-plus-plus` → `stremio-plus-plus setup`: the wizard
    detects the LAN IP, finds TVs (SSDP), offers providers, writes config, installs launchd agents.
 3. **Docker Compose** for always-on Linux boxes (N100, NAS): server.js + companion + whisper.cpp;
    `docker compose up` with a `.env`.
@@ -84,8 +84,8 @@ keychain (or the env file on Docker).
 |---|---|---|---|
 | 1 | Public repo now, or after the refactor? | now / after | **After** phase A: today's repo has the owner's IP, domain and paths in committed config; secrets are encrypted but the history shows them as files. Fresh public repo or history-preserving after scrubbing config. |
 | 2 | License | MIT · Apache-2.0 · GPL | **Apache-2.0** (patent grant; no GPL entanglement: we don't ship stremio-web or server.js) |
-| 3 | Name | keep · rename | Keep "stremio-companion" but describe it as "a companion **for** Stremio"; check Stremio's trademark guidance before publishing |
-| 4 | Owner's own setup | stays in this repo · separate private deployment repo | **Separate**: public `stremio-companion` (generic) + private `stremio-companion-deploy` (or a profile in `Nomadware.io`) with the owner's config.toml, encrypted secrets, DNS record |
+| 3 | Name | ~~keep · rename~~ | **Decided 2026-10-21: stremio++** (repo and package slug `stremio-plus-plus`, GitHub allows no `+`). Still check Stremio's trademark guidance before publishing |
+| 4 | Owner's own setup | stays in this repo · separate private deployment repo | **Separate**: public `stremio-plus-plus` (generic) + private `stremio-plus-plus-deploy` (or a profile in `Nomadware.io`) with the owner's config.toml, encrypted secrets, DNS record |
 | 5 | First providers | — | translator: `claude-cli`, `anthropic`, `openai-compatible` (covers OpenAI/OpenRouter/OpenCode/Ollama); STT: `mlx-whisper` + `faster-whisper`; HTTPS: `own-domain` + `tailscale-funnel`; TV: `samsung-tizen` |
 | 6 | Default translator for new users | claude-cli · API key · local | **API key or local (Ollama)**: `claude-cli` on a consumer subscription is the user's own call (personal use only); documented, not the default |
 

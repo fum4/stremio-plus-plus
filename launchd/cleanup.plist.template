@@ -3,18 +3,18 @@
 <!-- Daily cache cleanup (torrents unplayed for 7 days + disk-reserve eviction). Rendered by `mise run services:install`. -->
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>io.github.fum4.stremio-companion.cleanup</string>
+  <key>Label</key><string>io.github.fum4.stremio-plus-plus.cleanup</string>
   <key>ProgramArguments</key>
   <array>
     <string>@MISE@</string><string>exec</string><string>--cd</string><string>@REPO@</string>
-    <string>--</string><string>scripts/with-secrets.sh</string><string>python</string><string>-m</string><string>stremio_companion.downloads.cleanup_job</string>
+    <string>--</string><string>scripts/with-secrets.sh</string><string>python</string><string>-m</string><string>stremio_plus_plus.downloads.cleanup_job</string>
   </array>
   <!-- launchd's PATH is /usr/bin:/bin only: Homebrew (bash 5, ffmpeg) and ~/.local/bin (repo-secrets). -->
   <key>EnvironmentVariables</key>
   <dict><key>PATH</key><string>@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
   <!-- launchd runs a missed slot at the next wake, so a sleeping laptop still gets its daily pass. -->
   <key>StartCalendarInterval</key><dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>30</integer></dict>
-  <key>StandardOutPath</key><string>@HOME@/Library/Logs/stremio-companion/cleanup.log</string>
-  <key>StandardErrorPath</key><string>@HOME@/Library/Logs/stremio-companion/cleanup.log</string>
+  <key>StandardOutPath</key><string>@HOME@/Library/Logs/stremio-plus-plus/cleanup.log</string>
+  <key>StandardErrorPath</key><string>@HOME@/Library/Logs/stremio-plus-plus/cleanup.log</string>
 </dict>
 </plist>
