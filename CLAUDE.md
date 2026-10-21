@@ -26,6 +26,7 @@ A Python service + launchd setup on the owner's Mac (**Batman**) that extends th
 ## Routing
 | Occasion | Doc | Guardrail |
 |---|---|---|
+| Make it usable by others (config, providers, distribution) | [docs/design/public-release.md](docs/design/public-release.md) | proposal: nothing built until the owner decides the open questions |
 | Move to another host | [docs/runbooks/migrate-host.md](docs/runbooks/migrate-host.md) | everything per-machine lives in `.env.local`, `state.db` and logins; `mise run host:doctor` must be all green |
 | Change anything on the TV | [docs/runbooks/tv-setup.md](docs/runbooks/tv-setup.md) | record the current value and the revert step first |
 | Rely on a server.js behaviour | [docs/research/stremio-internals.md](docs/research/stremio-internals.md) | re-verify against the pinned bundle; cite file:line |
