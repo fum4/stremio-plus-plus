@@ -28,7 +28,14 @@ We set our own `APP_PATH` (`~/Library/Application Support/stremio-companion/stre
 | `cacheSize == 0` (or `--noCache`) → 15 MB buffer + **45 MB in-memory circular buffer** + `swarmCap.maxBuffer .75` — the mode that stops downloading while paused | `server.js:48184` |
 | Every engine creation trims the cache dir to `cacheSize` (`cache.clearCache(..., settings.cacheSize, 0)`) → a finite cache can evict a file we are still processing | `server.js:48110` |
 
-→ cache **Infinite**. How the UI encodes "Infinite" in `server-settings.json` (null? a huge number?) is a phase-0 check.
+**"Infinite" = `cacheSize: null`** — the UI's options are `[0, 2 GiB, 5 GiB, 10 GiB, null]` (stremio-web `src/routes/Settings/Streaming/useStreamingOptions.ts:9`; the server's own `/settings` `options` say the same, `∞ → null`). JSON can't hold `Infinity`, so it is stored as `null`.
+
+**What `null` actually does** (`clearCache`, `server.js:36236-36266`): the early return is `toSize == 1/0`, which `null` fails; then `Math.min(null, …)` coerces to `0`, so **every engine creation deletes every cached file of every *inactive* engine**. Files of engines still in `enginefs.list()` are skipped (`omit`). So "∞" really means "keep only what's active, clean the rest on the next engine creation" — no re-watch cache, but no disk fill either.
+
+→ For us: cache = `null`. The file we're processing stays safe **as long as its engine is alive** — the engine pin is what guarantees that. A huge finite value would instead keep everything until the disk is full (`toSize` is capped at `used + free`).
+
+## Torrent profiles
+stremio-web `useStreamingOptions.ts:30-61`: default (hard 3.5 MiB/s, 55 conns), soft, fast (hard 37.5 MiB/s, 200 conns), **ultra fast** (hard 75 MiB/s, soft 8 MiB/s, 400 conns, 25 s handshake, 6 s request timeout). We apply ultra fast + `cacheSize: null` from `infra/stremio-server/settings.json` via `POST /settings` (`mise run server:configure`; re-applied on every `install-service`). `POST /settings` merges and persists to `$APP_PATH/server-settings.json`; verified surviving a restart.
 
 ## Engine lifecycle
 | Fact | Evidence |
@@ -48,6 +55,9 @@ We set our own `APP_PATH` (`~/Library/Application Support/stremio-companion/stre
 
 So with cache > 0 the server already downloads the whole file; the only things stopping it are the engine dying (pin) and the speed cap (profile).
 
+## Remote HTTPS (`remoteHttps`)
+Setting `remoteHttps` to a LAN IP makes the server fetch a cert via `GET /get-https?ipAddress=<ip>` (`server.js:48041`, `https.newCertificate`) and serve HTTPS on **:12470** for `<ip-with-dashes>.519b6502d940.stremio.rocks`, a public DNS name resolving to that private IP (Let's Encrypt wildcard). This is how a non-localhost client (the TV app) can use a LAN server. The server **logs the client's `authKey` in plain text** on `/get-https` requests (server.log).
+
 ## Endpoints
 `/{ih}/create`, `/{ih}/{idx}`, `/{ih}/{idx}/stats.json`, `/stats.json`, `/opensubHash?videoUrl=`, `/subtitles.:ext?from=&offset=`, `/subtitlesTracks`, `/tracks/:url`, `/hlsv2/probe`, `POST /settings`.
 
@@ -57,6 +67,7 @@ So with cache > 0 the server already downloads the whole file; the only things s
 - The subtitles request carries `filename`, `videoSize`, `videoHash` (OpenSubtitles hash) — **no infoHash**. We match against the server's `/stats.json` (active engines → files → name/size), then read `localhost:11470/{ih}/{idx}`.
 
 ## The TV side
-- Stremio publishes `tizen/server.js` builds → the official TV app most likely runs an **on-TV server** (tiny cache). Pointing the TV at Batman replaces it; Batman asleep ⇒ no torrent playback until reverted.
+- **Confirmed 2026-10-21:** the TV's server URL is `http://127.0.0.1:11470`, server **v4.20.8** — an **on-TV server** (the published `tizen/server.js` build). That's the likely cause of today's pause stalls. Pointing the TV at Batman replaces it; Batman asleep ⇒ no torrent playback until reverted.
+- **The TV app is "Stremio Theater v1.12.1" (platform tizen 5.5), not stremio-web.** No public repo under the Stremio org matches "theater" (checked 2026-10-21) → closed source. Consequences: (1) the stremio-video `subtitles.vtt?from=` rewrite and the once-per-load subtitle request were researched in stremio-web/stremio-video/stremio-core and may not hold for Theater — phase 0 must test them on the TV; (2) a `stremio-web` fork would **replace** the official app with a different one, not patch it.
 - A stock stremio-web build on Tizen falls back to HTMLVideo: platform `tizen` vs `'Tizen'` in `src/common/Platform/device.ts:31-33`, and `index.html` doesn't load `$WEBAPIS/webapis/webapis.js`. Only relevant if we fork (deferred).
 - stremio-web: GPL-2.0, ~5 commits/day. enginefs: public, **no LICENSE file**.

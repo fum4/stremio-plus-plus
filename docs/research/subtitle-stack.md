@@ -1,6 +1,6 @@
 # Subtitle stack — choices and why
 
-Status: **proposed**, to be benchmarked on Batman (M4 Pro, 48 GB) in phase 0 ([phase-0-results.md](phase-0-results.md)). Versions are re-checked at pin time, never from memory.
+Status: sync + STT **benchmarked 2026-10-21** (numbers in [phase-0-results.md](phase-0-results.md)); translation pending. Originally proposed to be benchmarked on Batman (M4 Pro, 48 GB) in phase 0 ([phase-0-results.md](phase-0-results.md)). Versions are re-checked at pin time, never from memory.
 
 ## Sync
 | Choice | Why | Alternatives |
@@ -13,8 +13,8 @@ Estimate ~30 s/movie once audio is local. Audio: ffprobe picks `language=eng` > 
 ## Speech-to-text
 | Choice | Why |
 |---|---|
-| **parakeet-mlx** (`parakeet-tdt-0.6b-v3`) for English | MLX-native on Apple Silicon, word timestamps, est. 1–3 min per full movie |
-| **Whisper large-v3-turbo** via mlx-audio / mlx-whisper for other languages | multilingual; turbo is the speed/quality knee |
+| **Whisper large-v3-turbo** via mlx-whisper, `condition_on_previous_text=False`, `hallucination_silence_threshold=2`, every decoding option explicit | **changed after the phase-0 bench**: 17.5 % WER, 96–97 % of cues covered, 29× realtime (~4 min per 2 h film); multilingual. Defaults hallucinate loops — never run it on defaults |
+| parakeet-mlx (`parakeet-tdt-0.6b-v3`) — not primary | ~100× realtime and no hallucinations, but missed 20–25 % of cues (short shouts, action-scene lines). Speed isn't the bottleneck (the download is), coverage is → Whisper wins. Re-test if a newer parakeet improves recall |
 | **Silero VAD** gate | skip silence/music, cut chunks at silences, cuts hallucinations on non-speech |
 
 Chunks overlap 1–2 s, cut at VAD silences, stay 2–5 min ahead of the playhead.

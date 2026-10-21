@@ -9,7 +9,11 @@ repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
 
 git fetch -q origin "$head_sha" 2>/dev/null || true
 if ! git diff --quiet "$head_sha" || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-  echo "gate: working tree differs from PR head $head_sha — commit/push or stash first" >&2
+  if [ "$(git rev-parse HEAD)" != "$head_sha" ]; then
+    echo "gate: PR head is $head_sha but local HEAD is $(git rev-parse HEAD) — just pushed? retry in a few seconds" >&2
+  else
+    echo "gate: working tree differs from PR head $head_sha — commit/push or stash first" >&2
+  fi
   exit 1
 fi
 

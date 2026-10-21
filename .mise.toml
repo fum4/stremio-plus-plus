@@ -23,6 +23,10 @@ run = [
 description = "Download the pinned streaming server.js into var/ and verify its sha256"
 run = "scripts/stremio-server-fetch.sh"
 
+[tasks."server:configure"]
+description = "Apply infra/stremio-server/settings.json (cache Infinite, ultra-fast torrent profile) to the running server"
+run = "scripts/stremio-server-configure.sh"
+
 [tasks.install-service]
 description = "Render launchd/*.plist.template into ~/Library/LaunchAgents and (re)load them (args: server companion; default all)"
 depends = ["server:fetch"]

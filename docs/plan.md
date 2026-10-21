@@ -25,7 +25,7 @@ v1 runs on Batman (MacBook Pro M4 Pro, 48 GB). It may move to an always-on box (
 | TV app refuses plain-http addons / subtitle URLs | features 2–3 blocked | phase 0 check; fallback: tailscale-serve HTTPS or the thin fork |
 | TV app has no streaming-server URL setting | everything blocked | phase 0 check; fallback: fork + sideload via Tizen `sdb` |
 | Batman asleep / off mid-film | TV can't play torrents | runbook: one-setting revert; `caffeinate`/`pmset` guidance; later an always-on box |
-| Infinite cache fills the disk | Mac out of space | cache lives in our own `APP_PATH`; backlog: a cleanup policy (age/LRU outside server.js) |
+| Disk space — Batman had **~10 GiB free** (98%) on 2026-10-21; a 4K remux is 20–60 GB | film can't be cached whole; macOS unstable when full | `cacheSize: null` already cleans inactive torrents on each new engine (verified); owner frees space or picks an external drive as `cacheRoot` |
 | TV can't decode the codec (HEVC/DV/DTS) and can't transcode | no playback | record TV model/codec support; server's HLS transcode path (ffmpeg on Batman) |
 | server.js changes behaviour on bump | pin breaks | pinned + sha256; re-verify [stremio-internals.md](research/stremio-internals.md) on every bump |
 | Subtitles requested once per load | generated track not visible until reload | serve only finished tracks; optional "generating… reload in N min" stub |
