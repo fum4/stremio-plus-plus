@@ -13,6 +13,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 LogFormat = Literal["json", "console"]
+TvOs = Literal["samsung", "webos", "androidtv", "firetv"]
 
 
 class Env(BaseSettings):
@@ -25,6 +26,7 @@ class Env(BaseSettings):
     companion_data_dir: Path
     host_lan_ip: IPv4Address
     tv_host: IPv4Address
+    tv_os: TvOs  # which tv/ adapter controls the TV; only samsung is verified on hardware
     claude_cli: Path
     addon_domain: str = Field(min_length=1)
     addon_https_port: int = Field(ge=1, le=65535)

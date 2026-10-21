@@ -1,7 +1,7 @@
 import base64
 import json
 
-from stremio_plus_plus.tv.protocol import (
+from stremio_plus_plus.tv.samsung_protocol import (
     Connected,
     Other,
     Refused,

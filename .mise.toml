@@ -89,11 +89,11 @@ description = "Get/renew the Let's Encrypt certificate for ADDON_DOMAIN (DNS-01,
 run = "repo-secrets exec secrets/acme.env.age -- scripts/tls-renew.sh"
 
 [tasks.tv]
-description = "Control the TV from this host: pair | status | key KEY_X... | text '<string>' (mise run tv -- pair)"
+description = "Control the TV (TV_OS: samsung|webos|androidtv|firetv) from this host: pair | status | key HOME DOWN ENTER... | text '<string>' (mise run tv -- pair)"
 run = "scripts/with-secrets.sh python -m stremio_plus_plus.tv.cli"
 
 [tasks."host:promote"]
-description = "Make this Mac the Stremio host: setup, Whisper model, TLS certificate, launchd agents, pair with the TV (press Allow), then the doctor (devbox `onboard`)"
+description = "Make this Mac the Stremio host: setup, Whisper model, TLS certificate, launchd agents, pair with the TV (confirm on the TV, or type its code on Android TV), then the doctor (devbox `onboard`)"
 alias = "onboard"
 run = [
   "mise run setup",
