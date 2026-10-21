@@ -13,11 +13,12 @@ v1 runs on Batman (MacBook Pro M4 Pro, 48 GB). It may move to an always-on box (
 ## Phases (one PR each, each behind a green pre-merge)
 | # | What | Exit criterion |
 |---|---|---|
-| 0 | **Spike**: server on Batman, TV pointed at it, pause/subtitle/revert checks, benchmarks | [phase-0-results.md](research/phase-0-results.md) + owner go/no-go |
-| 1 | Companion skeleton: FastAPI, addon manifest, launchd, **engine pin** + tests | paused 5 min on the TV, download keeps rising, playback resumes |
-| 2 | **Best RO track, zero clicks**: our addon is the only RO source and returns one "RO" track = synced human sub (OpenSubtitles candidates → ffsubsync `--no-fix-framerate` → verified against our Whisper transcript) or else AI; TV preferred subtitle language = Romanian | any title with an RO human sub plays with synced RO subs, no clicks |
-| 3 | **Generate**: Whisper turbo (centre channel) → Haiku RO via the `claude` CLI on the owner's subscription (serial, hourly cap) → SRT; work ahead (rest of the file + next episodes of a season pack); delay the first answer ~1 min; auto re-select via the TV remote API when generation passes the playhead | first-time AI-only title shows RO subs with zero clicks |
-| 4 | Optional fork (`fum4/stremio-web`) for mid-film track refresh / native AVPlay | only if phase 0–3 show the official app can't |
+| 0 | **Spike** — done 2026-10-21 | [phase-0-results.md](research/phase-0-results.md) |
+| 1 | **Companion core**: FastAPI app + launchd agent; Stremio server client; **watch tracker** (tails the server log: which file the TV opens, where it seeks, when it stops); persistent state (SQLite) | `mise run dev` shows live TV playback events |
+| 2 | **Downloads**: engine pin while the TV or a job needs the file; **prefetch the next episode** of a season pack as soon as one starts; cache policy = keep until disk pressure; **daily cleanup** of files not played for 7 days (launchd calendar job) | E04 downloading as soon as E03 starts; untouched files gone after 7 days |
+| 3 | **Romanian (AI) subtitles**: persistent subtitle store (per file, per 2-min chunk); generation starts **at the playhead** and works outward (ahead first, then back-fill), so resuming mid-episode is instant the second time and fast the first; Whisper turbo (centre channel) → Haiku via the `claude` CLI (subscription, serial, hourly cap); label "Romanian (AI)"; spike code deleted | resume at minute 30 shows subs within ~30 s; a rewatch shows them instantly |
+| 4 | **Migration-ready**: one-command bootstrap (`mise run bootstrap`), migration runbook (new host, LAN IP, TV URL, Claude CLI login, age key), HTTPS for the addon on `nomadware.io` (replaces the quick tunnel) | fresh Mac → working setup by following one runbook |
+| 5 | Later: zero-click selection (preferred language + synced human RO subs), exact playhead via a proxy, fallback when the host sleeps | — |
 
 ## Risks
 | Risk | Impact | Mitigation |
@@ -25,7 +26,7 @@ v1 runs on Batman (MacBook Pro M4 Pro, 48 GB). It may move to an always-on box (
 | TV app refuses plain-http addons / subtitle URLs | features 2–3 blocked | phase 0 check; fallback: tailscale-serve HTTPS or the thin fork |
 | TV app has no streaming-server URL setting | everything blocked | phase 0 check; fallback: fork + sideload via Tizen `sdb` |
 | Batman asleep / off mid-film | TV can't play torrents | runbook: one-setting revert; `caffeinate`/`pmset` guidance; later an always-on box |
-| Disk space — Batman had **~10 GiB free** (98%) on 2026-10-21; a 4K remux is 20–60 GB | film can't be cached whole; macOS unstable when full | `cacheSize: null` already cleans inactive torrents on each new engine (verified); owner frees space or picks an external drive as `cacheRoot` |
+| Disk space — Batman ~7 GiB free; the target host (owner's other Mac) has plenty | caching whole files and next episodes | cache = keep until disk pressure (server trims LRU only when the disk would overflow) + 7-day cleanup; manager keeps ≥ 3 GiB free |
 | TV can't decode the codec (HEVC/DV/DTS) and can't transcode | no playback | record TV model/codec support; server's HLS transcode path (ffmpeg on Batman) |
 | server.js changes behaviour on bump | pin breaks | pinned + sha256; re-verify [stremio-internals.md](research/stremio-internals.md) on every bump |
 | Subtitle file fetched once per track selection (verified: re-selecting re-fetches) | late-generated cues invisible until the next fetch | work ahead, delayed first answer, automated re-select via TV remote API (to verify) |

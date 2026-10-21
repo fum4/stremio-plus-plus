@@ -1,0 +1,4 @@
+# Query tag on every request the companion makes to the server, so the watch tracker can tell
+# our own reads (pin, audio extraction) from the TV's in the server log.
+COMPANION_TAG = "src=companion"
+REQUEST_TIMEOUT_S = 10.0

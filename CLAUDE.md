@@ -7,14 +7,16 @@ A Python service + launchd setup on the owner's Mac (**Batman**) that extends th
 
 ## Invariants
 - **The TV must always be revertible in one setting.** Nothing we do may leave the TV unable to play without Batman. Every TV-side change is recorded with its revert step in [docs/runbooks/tv-setup.md](docs/runbooks/tv-setup.md) in the same PR.
-- **Never set the server cache to 0** (it switches to a 45 MB in-memory ring buffer that stops while paused) and **never set a finite cache** (it trims on every engine creation and can evict a file we're still processing). Cache = Infinite.
+- **Never set the server cache to 0** (it switches to a 45 MB in-memory ring buffer that stops while paused). Cache policy and its exact semantics: [docs/research/stremio-internals.md](docs/research/stremio-internals.md) § Cache.
 - **server.js is a pinned, closed binary** (`infra/env/stremio-server.env`, sha256-verified). Tune it only through its settings / `POST /settings`, never by patching the bundle.
 - **Portable host.** Everything the Mac needs is in the repo: `Brewfile`, `.mise.toml`, `launchd/`, `scripts/`, `infra/env/`. No hand-tweaked machine state; Linux (systemd) must stay a template away.
 - **Subtitles are served only when finished.** stremio-core requests subtitles once per load; never serve a partial track.
 - **The translation model never sees timestamps.** Cue ids in, cue ids out; code re-applies timings and re-wraps (≤ 2 lines × ~42 chars).
 
 ## Layering (src/stremio_companion/)
-`config/` (typed env, the only reader of the environment) ← `log/` ← feature packages (`pin/`, `addon/`, `sync/`, `generate/` — added per phase) ← `boot.py` / the FastAPI app. Feature packages don't import each other; shared pieces get their own package. One concern per file, ≤ ~200 LOC, a `constants.py` per package for magic values, tests as `*_test.py` next to the code (Python module names are `snake_case`; the global kebab-case filename rule yields to the import system here).
+`config/` (typed env, the only reader of the environment) · `log/` → `server/` (Stremio server HTTP client) · `state/` (SQLite, append-only migrations) → `watch/` (server-log tracker → playback events) → feature packages (`downloads/`, `subtitles/`) → `app/` (FastAPI routes + lifespan wiring) → `boot.py`. Imports point only leftwards; feature packages never import each other. One concern per file, ≤ ~200 LOC, a `constants.py` per package for magic values, tests as `*_test.py` next to the code (Python module names are `snake_case`; the global kebab-case filename rule yields to the import system here).
+- Every request the companion makes to the server carries `?src=companion` (`server.client.StremioServer.file_url`) so the tracker never mistakes our reads for the TV's.
+- Per-run env overrides go through `mise exec -- env KEY=… <cmd>`: mise's env files win over variables set before `mise exec`.
 
 ## Mac-specific workflow (no `wt`, `devstack`, Ansible on Batman)
 - Branch + PR for every change; `.githooks/pre-push` refuses pushes to `main` and runs `mise run pre-push`.

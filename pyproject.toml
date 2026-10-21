@@ -7,8 +7,11 @@ authors = [
 ]
 requires-python = ">=3.14.8"
 dependencies = [
+    "fastapi>=0.156.4",
+    "httpx>=0.28.1",
     "pydantic-settings>=2.16.1",
     "structlog>=26.1.0",
+    "uvicorn>=0.54.0",
 ]
 
 [project.scripts]
@@ -22,6 +25,7 @@ build-backend = "uv_build"
 dev = [
     "pyright>=1.1.414",
     "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
     "ruff>=0.17.1",
 ]
 
@@ -46,3 +50,4 @@ venv = ".venv"
 testpaths = ["src"]
 python_files = ["*_test.py"]
 addopts = ["--strict-markers", "-ra"]
+asyncio_mode = "strict"
