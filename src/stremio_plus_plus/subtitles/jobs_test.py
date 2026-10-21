@@ -76,7 +76,8 @@ async def test_resume_mid_file_generates_the_playhead_chunk_first(tmp_path: Path
     runner = asyncio.create_task(jobs.run())
     await _until(lambda: len(store.done_chunks(IH, 2)) == 5)
     runner.cancel()
-    assert [int(o) for o in stt.offsets] == [238, 358, 478, 118, 0]  # playhead, ahead, back-fill
+    # 30 s lead-in at the playhead (300 s), then its chunk, ahead, back-fill.
+    assert [int(o) for o in stt.offsets] == [298, 238, 358, 478, 118, 0]
     assert all(c.text.startswith("ro:") for c in store.cues(IH, 2))
 
 
@@ -144,3 +145,32 @@ async def test_a_failed_probe_is_retried_when_the_track_is_selected_again(
     await _until(lambda: len(store.done_chunks(IH, 2)) == 5)
     runner.cancel()
     assert len(probes) == 2
+
+
+@pytest.mark.asyncio
+async def test_the_lead_in_is_served_before_its_chunk_is_done(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    full_chunk = asyncio.Event()  # the torrent is slow: a whole chunk's audio isn't there yet
+
+    async def probe(url: str) -> AudioTrack:
+        return AudioTrack(0, True, DURATION)
+
+    async def read_chunk(url: str, track: AudioTrack, start_s: float, length_s: float) -> Audio:
+        if length_s > 60:
+            await full_chunk.wait()
+        return np.zeros(16000, np.float32)
+
+    monkeypatch.setattr(audio, "probe", probe)
+    monkeypatch.setattr(audio, "read_chunk", read_chunk)
+    stt = FakeStt()
+    jobs, store = _jobs(tmp_path, stt)
+    jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
+    runner = asyncio.create_task(jobs.run())
+    await _until(lambda: bool(jobs.cues(IH, 2)))
+    assert store.done_chunks(IH, 2) == set()
+    assert [c.text for c in jobs.cues(IH, 2)] == ["ro:line@0"]
+    full_chunk.set()
+    await _until(lambda: len(store.done_chunks(IH, 2)) == 5)
+    runner.cancel()
+    assert len(jobs.cues(IH, 2)) == 5  # the lead-in is replaced by its chunk, not duplicated
