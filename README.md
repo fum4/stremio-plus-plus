@@ -34,9 +34,9 @@ Prereqs: Homebrew, `mise` (`brew install mise`), `gh`.
 git clone https://github.com/fum4/stremio-companion ~/_work/stremio-companion
 cd ~/_work/stremio-companion
 mise trust && mise install
-mise run setup                 # Brewfile deps, venv, git hooks
-mise run models:fetch          # Whisper model, ~1.6 GB, once per machine
-mise run install-service       # fetch the pinned server.js, load the launchd agents
+echo "HOST_LAN_IP=<this Mac's reserved LAN IP>" > .env.local
+mise run onboard               # Brewfile, venv, hooks, Whisper model, launchd agents, then the doctor
+mise run doctor                # re-check any time
 ```
 
 - Logs: `~/Library/Logs/stremio-companion/{server,companion}.log`
@@ -46,9 +46,11 @@ mise run install-service       # fetch the pinned server.js, load the launchd ag
 - Downloads: the playing file and the **next episode** of a season pack keep downloading in the background; a daily cleanup (04:30, or `mise run cleanup -- --dry-run`) deletes torrents unplayed for 7 days and keeps ≥ 3 GiB free.
 - Per-machine overrides (e.g. your LAN IP): `.env.local` (gitignored). Committed config: `infra/env/*.env`.
 
+Moving to another Mac: [docs/runbooks/migrate-host.md](docs/runbooks/migrate-host.md).
+
 ## Point the TV at it — and back
 
-Full steps: [docs/runbooks/tv-setup.md](docs/runbooks/tv-setup.md). In short: give the Mac a DHCP reservation, then in the TV app set **Settings → Streaming → server URL** to `http://<mac-LAN-IP>:11470`. **To revert**, set it back to the value recorded in the runbook. If the Mac is asleep or off, torrents won't play on the TV until you revert or wake it.
+Full steps: [docs/runbooks/tv-setup.md](docs/runbooks/tv-setup.md). In short: give the Mac a DHCP reservation, then in the TV app set **Settings → Streaming → server URL** to the HTTPS URL `mise run doctor` prints (the TV refuses plain http to anything but itself). **To revert**, set it back to the value recorded in the runbook. If the Mac is asleep or off, torrents won't play on the TV until you revert or wake it.
 
 ## Develop
 

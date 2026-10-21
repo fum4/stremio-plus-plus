@@ -26,6 +26,7 @@ A Python service + launchd setup on the owner's Mac (**Batman**) that extends th
 ## Routing
 | Occasion | Doc | Guardrail |
 |---|---|---|
+| Move to another host | [docs/runbooks/migrate-host.md](docs/runbooks/migrate-host.md) | everything per-machine lives in `.env.local`, `state.db` and logins; `mise run doctor` must be all green |
 | Change anything on the TV | [docs/runbooks/tv-setup.md](docs/runbooks/tv-setup.md) | record the current value and the revert step first |
 | Rely on a server.js behaviour | [docs/research/stremio-internals.md](docs/research/stremio-internals.md) | re-verify against the pinned bundle; cite file:line |
 | Pick or change a subtitle tool/model | [docs/research/subtitle-stack.md](docs/research/subtitle-stack.md) | benchmark on Batman before switching |
