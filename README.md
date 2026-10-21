@@ -19,7 +19,7 @@ No modified TV app: everything works through two settings in the stock Stremio a
 ```
 Samsung TV — Stremio app ("Stremio Theater")
   │  server URL:  https://<mac-ip-dashed>.519b6502d940.stremio.rocks:12470   (HTTPS: the TV refuses plain http)
-  │  addon:       "Romanian (AI)"  https://stremio.nomadware.io:8443/<secret>/manifest.json
+  │  addon:       "Stremio++"  https://stremio.nomadware.io:8443/<secret>/manifest.json
   │               (public name → the Mac's LAN IP, Let's Encrypt certificate; installed once from the desktop app)
   ▼
 Mac (launchd agents, all from this repo)
@@ -87,7 +87,7 @@ Then point the TV at it and install the addon: [docs/runbooks/tv-setup.md](docs/
 | Symptom | Check |
 |---|---|
 | TV says the server is **offline** | `mise run host:doctor`. Is the URL on the TV the **https** one it prints? Did the Mac's IP change (then `server:configure` and re-enter the URL)? |
-| No **Romanian (AI)** track | Is the addon installed (desktop app → Addons, URL from `mise run addon:url`)? `mise run host:doctor` checks the certificate and that the addon answers over HTTPS. `companion.log` should show a `subtitles` request when a title opens. |
+| No **Romanian (AI)** track | Is the **Stremio++** addon installed (desktop app → Addons, URL from `mise run addon:url`)? `mise run host:doctor` checks the certificate and that the addon answers over HTTPS. `companion.log` should show a `subtitles` request when a title opens. |
 | Track shows only *"Se generează…"* | Re-select it after a minute. `companion.log` shows `subtitle_chunk` lines as minutes are generated. |
 | Subtitles stopped mid-film | They were generated up to the point of your last selection; re-select the track. |
 | Disk filling up | `mise run cleanup -- --dry-run`; the cleanup keeps ≥ 3 GiB free automatically. |

@@ -33,11 +33,11 @@ A new Mac IP means a new hostname: re-run `mise run server:configure` and re-ent
 ## 4. Revert
 TV: Stremio → Settings → Streaming → server URL → **`http://127.0.0.1:11470`**. That's the only step: the TV goes back to its own server, and playback works with the Mac off. _(One-setting revert: confirm on the TV on the next occasion and tick this.)_
 
-## 5. Install the "Romanian (AI)" addon
+## 5. Install the "Stremio++" addon
 The TV app has no "add addon by URL" field; addons come from your Stremio account. Install **once**: the address never changes.
 1. On the Mac: `mise run addon:url` prints `https://stremio.nomadware.io:8443/<secret>/manifest.json`. The secret keeps strangers out; don't share the URL.
-2. Stremio desktop app (same account) → **Addons** → paste the URL into the search box → **Install**. Uninstall any older "Romanian (AI)" / "Companion" addon first.
-3. TV: Stremio → Settings → **Sync addons**. The track shows in the subtitles menu as **Romanian (AI)** (language Romanian).
+2. Stremio desktop app (same account) → **Addons** → paste the URL into the search box → **Install**. Uninstall any older "Romanian (AI)" / "Companion" addon first (the addon was called "Romanian (AI)" before v0.2.0; same id, so reinstalling replaces it).
+3. TV: Stremio → Settings → **Sync addons**. The addon is listed as **Stremio++**; its track shows in the subtitles menu as **Romanian (AI)** (language Romanian).
 
 How it reaches the Mac: `stremio.nomadware.io` is a public DNS name for the Mac's **LAN** IP (Nomadware.io `infra/terraform/records.tf`), so only devices at home reach it; the certificate is a real Let's Encrypt one, renewed weekly. The HTTPS port serves nothing but the token-protected addon.
 

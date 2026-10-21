@@ -27,9 +27,12 @@ lan_router = APIRouter()
 
 MANIFEST: dict[str, Any] = {
     "id": "io.github.fum4.stremio-plus-plus",
-    "version": "0.1.0",
-    "name": LABEL,
-    "description": "AI-generated Romanian subtitles (Whisper + Claude), from stremio++",
+    "version": "0.2.0",
+    "name": "Stremio++",
+    "description": (
+        "Extras for the Stremio TV app, served from your Mac. "
+        "Today: AI-generated Romanian subtitles (Whisper + Claude)."
+    ),
     "resources": ["subtitles"],
     "types": ["movie", "series"],
     "idPrefixes": ["tt", "kitsu"],
