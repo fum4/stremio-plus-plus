@@ -155,14 +155,15 @@ class SettingsFile:
     def _read_secrets(self) -> Secrets:
         if not self.secrets_path.exists():
             return Secrets()
+        # Errors name keys and lines only, and aren't chained: a traceback would print the values.
         name = self.secrets_path.name
         try:
             return Secrets.model_validate(tomllib.loads(self.secrets_path.read_text()))
         except tomllib.TOMLDecodeError as exc:  # line and column only, never the text
-            raise SettingsError(f"{name}: invalid TOML at line {exc.lineno}") from exc
+            raise SettingsError(f"{name}: invalid TOML at line {exc.lineno}") from None
         except ValidationError as exc:  # key names only: the values are secrets
             keys = ", ".join(".".join(str(p) for p in e["loc"]) for e in exc.errors())
-            raise SettingsError(f"{name}: invalid or unknown key(s): {keys}") from exc
+            raise SettingsError(f"{name}: invalid or unknown key(s): {keys}") from None
 
 
 def _parse_doc(path: Path) -> tomlkit.TOMLDocument:
