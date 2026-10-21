@@ -1,6 +1,6 @@
 # Proposal: make stremio++ usable by anyone (self-hosted, configurable)
 
-Status: **proposal** (2026-10-21), for the owner's decision. Nothing here is built yet.
+Status: **proposal** (2026-10-21), for the owner's decision. Configuration is decided and its phase 1 built: [config-ui.md](config-ui.md) (TOML file + Svelte UI, translator adapter).
 
 ## Goal
 Anyone with a Stremio TV/client and a spare computer can run their own companion: their machine, their

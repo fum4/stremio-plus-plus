@@ -23,14 +23,28 @@ from stremio_plus_plus.subtitles.constants import (
     TAIL_READ_FRACTION,
 )
 from stremio_plus_plus.subtitles.cues import Cue
-from stremio_plus_plus.subtitles.scheduler import Span, next_fill, next_window
+from stremio_plus_plus.subtitles.scheduler import Span, merged, next_fill, next_window
 from stremio_plus_plus.subtitles.store import SubtitleFile, SubtitleStore
 from stremio_plus_plus.subtitles.stt import Transcriber
-from stremio_plus_plus.subtitles.translate import Translator
+from stremio_plus_plus.subtitles.translators.base import Translator
 from stremio_plus_plus.watch.events import Event, FileRequested
 
 log = structlog.get_logger()
 FileKey = tuple[str, int]
+
+
+@dataclass(frozen=True)
+class JobProgress:
+    """A job as the status page shows it."""
+
+    info_hash: str
+    file_index: int
+    file_name: str
+    duration_s: float | None
+    playhead_s: float
+    covered: tuple[Span, ...]  # merged (start_s, end_s) intervals already subtitled
+    failed: bool
+    last_active: float
 
 
 @dataclass
@@ -131,6 +145,24 @@ class SubtitleJobs:
 
     def cues(self, info_hash: str, file_index: int) -> list[Cue]:
         return self._store.cues(info_hash, file_index)
+
+    def progress(self) -> list[JobProgress]:
+        out: list[JobProgress] = []
+        for job in sorted(self._jobs.values(), key=lambda j: j.last_active, reverse=True):
+            covered = tuple(merged(self._store.spans(job.info_hash, job.file_index)))
+            out.append(
+                JobProgress(
+                    job.info_hash,
+                    job.file_index,
+                    job.file_name,
+                    job.meta.duration_s if job.meta else None,
+                    job.playhead_s(),
+                    covered,
+                    job.dead,
+                    job.last_active,
+                )
+            )
+        return out
 
     def generating(self, info_hash: str, file_index: int) -> bool:
         job = self._jobs.get((info_hash, file_index))

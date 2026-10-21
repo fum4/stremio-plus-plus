@@ -18,6 +18,7 @@ description = "Lightweight, secret-free, idempotent install: Brewfile deps, venv
 run = [
   "brew bundle --file=Brewfile --quiet",
   "uv sync --frozen",
+  "npm ci --prefix web --no-audit --no-fund",
   "git config core.hooksPath .githooks",
   "scripts/install-repo-secrets.sh",
 ]
@@ -32,7 +33,7 @@ run = "scripts/stremio-server-configure.sh"
 
 [tasks."services:install"]
 description = "Render launchd/*.plist.template into ~/Library/LaunchAgents and (re)load them (args: server companion cleanup; default all)"
-depends = ["server:fetch"]
+depends = ["server:fetch", "ui:build"]
 run = "scripts/launchd-install.sh"
 
 [tasks."services:uninstall"]
@@ -81,8 +82,8 @@ description = "Delete cached torrents unplayed for 7 days and evict LRU below th
 run = "scripts/with-secrets.sh python -m stremio_plus_plus.downloads.cleanup_job"
 
 [tasks."models:fetch"]
-description = "Download the Whisper model (~1.6 GB, once per machine) into the Hugging Face cache"
-run = "python -c 'from huggingface_hub import snapshot_download; from stremio_plus_plus.subtitles.constants import WHISPER_MODEL; print(snapshot_download(WHISPER_MODEL))'"
+description = "Download the Whisper model set in config.toml (~1.6 GB for the default, once per machine) into the Hugging Face cache"
+run = "scripts/with-secrets.sh python -m stremio_plus_plus.subtitles.model_fetch"
 
 [tasks."tls:renew"]
 description = "Get/renew the Let's Encrypt certificate for ADDON_DOMAIN (DNS-01, Cloudflare); restarts the companion when renewed"
@@ -121,6 +122,22 @@ run = "scripts/with-secrets.sh sh -c 'echo https://$ADDON_DOMAIN:$ADDON_HTTPS_PO
 description = "Run the companion in the foreground with reload"
 run = "scripts/with-secrets.sh python -m stremio_plus_plus"
 
+[tasks."ui:build"]
+description = "Build the admin UI (web/, Svelte) into web/dist; the companion serves it on the LAN port"
+run = "npm run build --prefix web"
+
+[tasks."ui:dev"]
+description = "Admin UI with hot reload against the running companion (COMPANION_URL, default localhost:11471)"
+run = "npm run dev --prefix web"
+
+[tasks."ui:mock"]
+description = "Admin UI with hot reload against canned data (no host needed)"
+run = "npm run dev:mock --prefix web"
+
+[tasks."ui:check"]
+description = "Type-check the admin UI (svelte-check)"
+run = "npm run check --prefix web"
+
 [tasks.format]
 description = "Format the code (writes)"
 run = "uv run ruff format ."
@@ -143,7 +160,7 @@ run = "uv run pytest"
 
 [tasks.pre-push]
 description = "Static checks: format, lint, typecheck (no tests)"
-depends = ["format:check", "lint", "typecheck"]
+depends = ["format:check", "lint", "typecheck", "ui:check"]
 
 [tasks.pre-merge]
 description = "Unit tests"

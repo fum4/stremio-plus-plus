@@ -9,7 +9,6 @@ import structlog
 
 from stremio_plus_plus.downloads.constants import (
     COMPLETE_PROGRESS,
-    MIN_FREE_BYTES,
     PIN_SWEEP_INTERVAL_S,
 )
 from stremio_plus_plus.downloads.episodes import next_episode
@@ -28,12 +27,14 @@ class DownloadManager:
         server: StremioServer,
         pinner: Pinner,
         free_bytes: Callable[[], int],
+        min_free_bytes: Callable[[], int],  # read per decision: follows config.toml edits
         on_next_episode: NextEpisodeHook | None = None,
     ) -> None:
         self._server = server
         self._pinner = pinner
         self._free_bytes = free_bytes
         self._on_next_episode = on_next_episode  # e.g. subtitles for it, ahead of time
+        self._min_free_bytes = min_free_bytes
 
     async def __call__(self, event: Event) -> None:
         if isinstance(event, EngineDestroyed):
@@ -61,7 +62,7 @@ class DownloadManager:
         if (await self._server.file_progress(event.info_hash, nxt.index) or 0) >= COMPLETE_PROGRESS:
             return
         free = self._free_bytes()
-        if free - nxt.length < MIN_FREE_BYTES:
+        if free - nxt.length < self._min_free_bytes():
             log.warning(
                 "prefetch_skipped_low_disk", next=nxt.name, free_gb=round(free / 1024**3, 1)
             )

@@ -2,7 +2,6 @@ import asyncio
 
 import pytest
 
-from stremio_plus_plus.downloads.constants import MIN_FREE_BYTES
 from stremio_plus_plus.downloads.fake_server_test_support import FakeServer
 from stremio_plus_plus.downloads.manager import DownloadManager
 from stremio_plus_plus.downloads.pins import Pinner
@@ -10,6 +9,7 @@ from stremio_plus_plus.watch.events import EngineDestroyed, FileRequested
 
 IH = "aa" * 20
 GB = 1024**3
+MIN_FREE_BYTES = 3 * GB
 STATS = {
     IH: {
         "name": "Show S01",
@@ -27,7 +27,7 @@ def _manager(
 ) -> tuple[DownloadManager, Pinner, FakeServer]:
     fake = FakeServer(STATS, progress)
     pinner = Pinner(fake.http, fake.client)
-    return DownloadManager(fake.client, pinner, lambda: free), pinner, fake
+    return DownloadManager(fake.client, pinner, lambda: free, lambda: MIN_FREE_BYTES), pinner, fake
 
 
 @pytest.mark.asyncio
@@ -81,7 +81,7 @@ async def test_the_next_episode_is_announced_even_when_already_downloaded() -> N
     def hook(info_hash: str, playing: int, index: int, name: str, length: int) -> None:
         seen.append((info_hash, playing, index, name, length))
 
-    manager = DownloadManager(fake.client, pinner, lambda: 100 * GB, hook)
+    manager = DownloadManager(fake.client, pinner, lambda: 100 * GB, lambda: MIN_FREE_BYTES, hook)
     await manager(FileRequested(IH, 0, 0))
     assert seen == [(IH, 0, 1, "Show.S01E02.mkv", 2 * GB)]
     await pinner.close()

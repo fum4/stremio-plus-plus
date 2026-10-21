@@ -1,32 +1,20 @@
 import time
-from ipaddress import IPv4Address
 from pathlib import Path
 
 import httpx
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from pydantic import AnyHttpUrl
 
 from stremio_plus_plus.app import addon
 from stremio_plus_plus.app.addon import addon_router, lan_router
-from stremio_plus_plus.app.picker import Picker
-from stremio_plus_plus.app.services import Services
-from stremio_plus_plus.config.env import Env
-from stremio_plus_plus.downloads.manager import DownloadManager
-from stremio_plus_plus.downloads.pins import Pinner
-from stremio_plus_plus.server.client import StremioServer
+from stremio_plus_plus.app.services_test_support import TOKEN, make_services
 from stremio_plus_plus.server.constants import SUBTITLE_PROXY_TIMEOUT_S
-from stremio_plus_plus.state.db import open_db
-from stremio_plus_plus.state.plays import Plays
-from stremio_plus_plus.stream.sessions import Sessions
 from stremio_plus_plus.subtitles.cues import Cue
 from stremio_plus_plus.subtitles.jobs import SubtitleJobs
 from stremio_plus_plus.subtitles.store import SubtitleStore
-from stremio_plus_plus.subtitles.translate import ClaudeCliTranslator
 
 IH = "ab" * 20
-TOKEN = "k" * 32
 STATS = {
     IH: {
         "name": "MobLand S01",
@@ -35,59 +23,18 @@ STATS = {
 }
 
 
-class _NoStt:
-    async def transcribe(self, audio: object, offset_s: float) -> list[Cue]:
-        raise AssertionError("not used in route tests")
-
-
 def _client(tmp_path: Path) -> tuple[TestClient, SubtitleStore]:
     client, store, _ = _client_and_jobs(tmp_path)
     return client, store
 
 
 def _client_and_jobs(tmp_path: Path) -> tuple[TestClient, SubtitleStore, SubtitleJobs]:
-    env = Env(
-        stremio_server_url=AnyHttpUrl("http://srv:11470"),
-        stremio_server_log=tmp_path / "server.log",
-        companion_host="0.0.0.0",
-        companion_port=11471,
-        companion_data_dir=tmp_path,
-        host_lan_ip=IPv4Address("192.168.1.132"),
-        tv_host=IPv4Address("192.168.1.134"),
-        tv_os="samsung",
-        addon_domain="stremio.nomadware.io",
-        addon_https_port=8443,
-        addon_token=TOKEN,
-        claude_cli=Path("/bin/false"),
-        log_level="INFO",
-        log_format="json",
-    )
-    http = httpx.AsyncClient(
-        transport=httpx.MockTransport(lambda r: httpx.Response(200, json=STATS))
-    )
-    server = StremioServer("http://srv:11470", http)
-    db = open_db(tmp_path / "s.db")
-    store = SubtitleStore(db)
-    pinner = Pinner(http, server)
-    jobs = SubtitleJobs(server, store, _NoStt(), ClaudeCliTranslator(Path("/bin/false")))
+    services = make_services(tmp_path, lambda r: httpx.Response(200, json=STATS))
     app = FastAPI()
     app.include_router(addon_router)
     app.include_router(lan_router)
-    app.state.services = Services(
-        env=env,
-        http=http,
-        db=db,
-        server=server,
-        plays=Plays(db),
-        pinner=pinner,
-        downloads=DownloadManager(server, pinner, lambda: 0),
-        subtitle_store=store,
-        subtitles=jobs,
-        picker=Picker(http, server, tmp_path),
-        sessions=Sessions(tmp_path / "hls"),
-        playback_handlers=[],
-    )
-    return TestClient(app), store, jobs
+    app.state.services = services
+    return TestClient(app), services.subtitle_store, services.subtitles
 
 
 def test_manifest_names_the_addon_stremio_plus_plus(tmp_path: Path) -> None:
