@@ -106,3 +106,41 @@ async def test_same_video_from_another_torrent_is_reused_without_generation(tmp_
     await _until(lambda: len(store.done_chunks("bb" * 20, 0)) == 5)
     runner.cancel()
     assert len(stt.offsets) == calls
+
+
+@pytest.mark.asyncio
+async def test_a_failed_probe_is_retried_when_the_track_is_selected_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A slow torrent: the first probe times out before any data arrives.
+    probes: list[str] = []
+
+    async def probe(url: str) -> AudioTrack:
+        probes.append(url)
+        if len(probes) == 1:
+            raise TimeoutError
+        return AudioTrack(0, True, DURATION)
+
+    async def read_chunk(url: str, track: AudioTrack, start_s: float, length_s: float) -> Audio:
+        return np.zeros(16000, np.float32)
+
+    monkeypatch.setattr(audio, "probe", probe)
+    monkeypatch.setattr(audio, "read_chunk", read_chunk)
+    now = [1000.0]
+    opensub = httpx.MockTransport(lambda r: httpx.Response(200, json={"result": {}}))
+    server = StremioServer("http://srv", httpx.AsyncClient(transport=opensub))
+    store = SubtitleStore(open_db(tmp_path / "s.db"))
+    jobs = SubtitleJobs(server, store, FakeStt(), FakeTranslator(), clock=lambda: now[0])
+    runner = asyncio.create_task(jobs.run())
+    jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
+    await _until(lambda: len(probes) == 1)
+    await asyncio.sleep(0.05)
+    now[0] += 10  # re-selected right away: still cooling down, no hammering
+    jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
+    await asyncio.sleep(0.05)
+    assert len(probes) == 1
+    now[0] += 60  # re-selected a minute later: retried and generated
+    jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
+    await _until(lambda: len(store.done_chunks(IH, 2)) == 5)
+    runner.cancel()
+    assert len(probes) == 2
