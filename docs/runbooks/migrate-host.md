@@ -2,7 +2,17 @@
 
 Everything the host needs is in this repo; per-machine state is three things: `.env.local`, the companion's `state.db` (subtitles + play history), and logins. Allow ~30 min, most of it downloads.
 
+## Before you start: is this Mac a good host?
+- **Apple Silicon** (M1 or later): Whisper runs on MLX. An Intel Mac can't generate subtitles.
+- **Always on, on power, on the same Wi-Fi as the TV.** The host serves every torrent the TV plays.
+- **Disk:** whole episodes and the next one are cached; a few hundred GB free is comfortable (cleanup keeps ≥ 3 GiB free regardless).
+- **No Stremio desktop app running on it**: it starts its own server on port 11470 and collides with ours (you can still use it on another machine to install addons).
+
 ## On the new Mac
+0. **Host settings (one-time, macOS, needs your password):**
+   - Never sleep on power: `sudo pmset -c sleep 0 disksleep 0` (the display may still sleep: `displaysleep` is fine). Check with `pmset -g custom`.
+   - Survive reboots: System Settings → Users & Groups → **Automatic login** → your user. launchd agents only start after a login; with FileVault on, macOS asks for the password once at boot instead.
+   - If the macOS firewall is on (System Settings → Network → Firewall): when prompted, **Allow incoming connections** for `node` (the streaming server) and `python` (the companion).
 1. **Prereqs:** Homebrew; `brew install mise gh`; `gh auth login` (as `fum4`); Claude Code installed and logged in (`claude`, then `/login` with the plan that should pay for subtitle translation).
 2. **Clone:** `git clone https://github.com/fum4/stremio-companion ~/_work/stremio-companion && cd ~/_work/stremio-companion && mise trust && mise install`
 3. **Fixed LAN IP:** router → DHCP reservation for the new Mac's Wi-Fi MAC (`ifconfig en0 | awk '/ether/{print $2}'`; with *Private Wi-Fi address* = **Fixed** that's the private MAC). Then create `.env.local`:
@@ -20,7 +30,8 @@ Everything the host needs is in this repo; per-machine state is three things: `.
 8. **Addon:** in the Stremio desktop app (same account): Addons → uninstall "Romanian (AI)" → install `<HTTPS front>/manifest.json`. On the TV: Settings → *Sync addons*.
 
 ## On the old Mac
-9. Already done in step 4 if you copied the history; otherwise `mise run host:demote` (stops server, companion, cleanup). Optional: delete `~/Library/Application Support/stremio-companion/` to reclaim the cache.
+9. Already done in step 4 if you copied the history; otherwise `mise run host:demote` (stops server, companion, cleanup).
+10. Copy the repo's age key to the new Mac: `~/.config/age/stremio-companion.key` (mode 600). No secret uses it today, but future ones (e.g. the addon token) will. Optional: delete `~/Library/Application Support/stremio-companion/` to reclaim the cache.
 
 ## Revert
 TV server URL → `http://127.0.0.1:11470` (the TV's own server) — playback works with no Mac at all ([tv-setup.md](tv-setup.md)).
