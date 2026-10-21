@@ -30,9 +30,11 @@ else
 fi
 
 echo "Services"
-if curl -sf -m3 "$STREMIO_SERVER_URL/settings" >/dev/null; then
+# server.js is single-threaded: while it downloads at full speed it can take seconds to answer.
+if server_s="$(curl -sf -m10 -o /dev/null -w '%{time_total}' "$STREMIO_SERVER_URL/settings")"; then
   ok "streaming server up ($STREMIO_SERVER_URL)"
-  tv_url="$(curl -sf -m5 "$STREMIO_SERVER_URL/get-https?ipAddress=${HOST_LAN_IP:-}" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("https://%s:%s" % (d["domain"], d["port"]))' 2>/dev/null)"
+  awk -v t="$server_s" 'BEGIN { exit !(t > 3) }' && warn "streaming server slow (${server_s}s to answer: busy downloading)" "normal during fast downloads; persistent → mise run services:restart server"
+  tv_url="$(curl -sf -m10 "$STREMIO_SERVER_URL/get-https?ipAddress=${HOST_LAN_IP:-}" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("https://%s:%s" % (d["domain"], d["port"]))' 2>/dev/null)"
   [ -n "$tv_url" ] && ok "TV server URL: $tv_url" || warn "no HTTPS endpoint yet" "mise run server:configure"
 else
   bad "streaming server down" "mise run services:install server"
