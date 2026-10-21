@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import AnyHttpUrl
 
-from stremio_companion.app.addon import router
+from stremio_companion.app.addon import addon_router, lan_router
 from stremio_companion.app.services import Services
 from stremio_companion.config.env import Env
 from stremio_companion.downloads.manager import DownloadManager
@@ -20,6 +20,7 @@ from stremio_companion.subtitles.store import SubtitleStore
 from stremio_companion.subtitles.translate import ClaudeCliTranslator
 
 IH = "ab" * 20
+TOKEN = "k" * 32
 STATS = {
     IH: {
         "name": "MobLand S01",
@@ -42,6 +43,9 @@ def _client(tmp_path: Path) -> tuple[TestClient, SubtitleStore]:
         companion_data_dir=tmp_path,
         host_lan_ip=IPv4Address("192.168.1.132"),
         tv_host=IPv4Address("192.168.1.134"),
+        addon_domain="stremio.nomadware.io",
+        addon_https_port=8443,
+        addon_token=TOKEN,
         claude_cli=Path("/bin/false"),
         log_level="INFO",
         log_format="json",
@@ -54,7 +58,8 @@ def _client(tmp_path: Path) -> tuple[TestClient, SubtitleStore]:
     store = SubtitleStore(db)
     pinner = Pinner(http, server)
     app = FastAPI()
-    app.include_router(router)
+    app.include_router(addon_router)
+    app.include_router(lan_router)
     app.state.services = Services(
         env=env,
         http=http,
@@ -71,13 +76,13 @@ def _client(tmp_path: Path) -> tuple[TestClient, SubtitleStore]:
 
 def test_manifest_names_the_addon_romanian_ai(tmp_path: Path) -> None:
     client, _ = _client(tmp_path)
-    assert client.get("/manifest.json").json()["name"] == "Romanian (AI)"
+    assert client.get(f"/{TOKEN}/manifest.json").json()["name"] == "Romanian (AI)"
 
 
 def test_subtitles_request_matches_the_playing_file_by_name(tmp_path: Path) -> None:
     client, _ = _client(tmp_path)
     resp = client.get(
-        "/subtitles/series/tt31510819:1:3/filename=MobLand.S01E03.mkv&videoSize=3560556831&videoHash=1e89.json"
+        f"/{TOKEN}/subtitles/series/tt31510819:1:3/filename=MobLand.S01E03.mkv&videoSize=3560556831&videoHash=1e89.json"
     )
     [track] = resp.json()["subtitles"]
     assert track["lang"] == "ron" and track["label"] == "Romanian (AI)"
@@ -86,7 +91,9 @@ def test_subtitles_request_matches_the_playing_file_by_name(tmp_path: Path) -> N
 
 def test_unknown_file_gets_no_track(tmp_path: Path) -> None:
     client, _ = _client(tmp_path)
-    assert client.get("/subtitles/movie/tt1/filename=Other.mkv.json").json() == {"subtitles": []}
+    assert client.get(f"/{TOKEN}/subtitles/movie/tt1/filename=Other.mkv.json").json() == {
+        "subtitles": []
+    }
 
 
 def test_srt_serves_stored_cues_or_a_placeholder(tmp_path: Path) -> None:
@@ -94,3 +101,9 @@ def test_srt_serves_stored_cues_or_a_placeholder(tmp_path: Path) -> None:
     assert "Se generează" in client.get(f"/srt/{IH}/0.srt").text
     store.save_chunk(IH, 0, 0, [Cue(1.0, 2.0, "Unu")])
     assert client.get(f"/srt/{IH}/0.srt").text == "1\n00:00:01,000 --> 00:00:02,000\nUnu\n"
+
+
+def test_wrong_token_is_404(tmp_path: Path) -> None:
+    client, _ = _client(tmp_path)
+    assert client.get("/" + "z" * 32 + "/manifest.json").status_code == 404
+    assert client.get("/manifest.json").status_code == 404

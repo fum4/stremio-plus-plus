@@ -40,6 +40,21 @@ fi
 curl -sf -m3 "http://127.0.0.1:$COMPANION_PORT/health" >/dev/null && ok "companion up (:$COMPANION_PORT)" || bad "companion down" "mise run services:install companion; logs: ~/Library/Logs/stremio-companion/companion.log"
 launchctl print "gui/$(id -u)/io.github.fum4.stremio-companion.cleanup" >/dev/null 2>&1 && ok "daily cleanup agent loaded" || bad "cleanup agent missing" "mise run services:install cleanup"
 
+echo "Addon (HTTPS)"
+cert="${COMPANION_DATA_DIR/#\~/$HOME}/tls/certificates/$ADDON_DOMAIN.crt"
+if [ -f "$cert" ]; then
+  end="$(openssl x509 -noout -enddate -in "$cert" | cut -d= -f2)"
+  days=$(( ( $(date -j -f '%b %e %T %Y %Z' "$end" +%s) - $(date +%s) ) / 86400 ))
+  [ "$days" -ge 14 ] && ok "certificate for $ADDON_DOMAIN valid $days more days" || bad "certificate expires in $days days" "mise run tls:renew (weekly agent: services:install tls)"
+else
+  bad "no certificate for $ADDON_DOMAIN" "mise run tls:renew"
+fi
+resolved="$(dig +short "$ADDON_DOMAIN" @1.1.1.1 | tail -1)"
+[ "$resolved" = "${HOST_LAN_IP:-}" ] && ok "$ADDON_DOMAIN → $resolved (this host)" || bad "$ADDON_DOMAIN → ${resolved:-nothing}, not ${HOST_LAN_IP:-?}" "update the stremio record in Nomadware.io infra/terraform/records.tf"
+code="$(curl -s -o /dev/null -w '%{http_code}' -m5 "https://$ADDON_DOMAIN:$ADDON_HTTPS_PORT/${ADDON_TOKEN:-x}/manifest.json")"
+[ "$code" = 200 ] && ok "addon answers over HTTPS (mise run addon:url for the install URL)" || bad "addon over HTTPS returned ${code}" "mise run services:restart companion; companion.log"
+launchctl print "gui/$(id -u)/io.github.fum4.stremio-companion.tls" >/dev/null 2>&1 && ok "weekly certificate renewal agent loaded" || bad "tls agent missing" "mise run services:install tls"
+
 echo "TV"
 if nc -z -G 3 "$TV_HOST" 8002 2>/dev/null; then ok "TV reachable ($TV_HOST)"; else warn "TV not reachable at $TV_HOST" "TV off/asleep, or its IP changed (TV_HOST in infra/env/companion.env)"; fi
 python -m stremio_companion.tv.cli status >/dev/null 2>&1 && ok "this host is paired with the TV" || bad "not paired with the TV" "mise run tv -- pair (press Allow on the TV)"

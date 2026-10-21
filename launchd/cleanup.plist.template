@@ -7,11 +7,11 @@
   <key>ProgramArguments</key>
   <array>
     <string>@MISE@</string><string>exec</string><string>--cd</string><string>@REPO@</string>
-    <string>--</string><string>python</string><string>-m</string><string>stremio_companion.downloads.cleanup_job</string>
+    <string>--</string><string>scripts/with-secrets.sh</string><string>python</string><string>-m</string><string>stremio_companion.downloads.cleanup_job</string>
   </array>
-  <!-- launchd's PATH is /usr/bin:/bin only: ffmpeg/ffprobe live in Homebrew. -->
+  <!-- launchd's PATH is /usr/bin:/bin only: Homebrew (bash 5, ffmpeg) and ~/.local/bin (repo-secrets). -->
   <key>EnvironmentVariables</key>
-  <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+  <dict><key>PATH</key><string>@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
   <!-- launchd runs a missed slot at the next wake, so a sleeping laptop still gets its daily pass. -->
   <key>StartCalendarInterval</key><dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>30</integer></dict>
   <key>StandardOutPath</key><string>@HOME@/Library/Logs/stremio-companion/cleanup.log</string>

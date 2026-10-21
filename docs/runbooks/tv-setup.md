@@ -34,10 +34,12 @@ A new Mac IP means a new hostname: re-run `mise run server:configure` and re-ent
 TV: Stremio → Settings → Streaming → server URL → **`http://127.0.0.1:11470`**. That's the only step: the TV goes back to its own server, and playback works with the Mac off. _(One-setting revert: confirm on the TV on the next occasion and tick this.)_
 
 ## 5. Install the "Romanian (AI)" addon
-The TV app has no "add addon by URL" field; addons come from your Stremio account.
-1. The addon needs an HTTPS address. Until `nomadware.io` is set up: `mise run addon:tunnel` on the Mac prints `https://<random>.trycloudflare.com` (a new one every run).
-2. Stremio desktop app (same account) → **Addons** → paste `<https address>/manifest.json` into the search box → **Install**. If an older "Romanian (AI)" / "Companion" addon is listed, uninstall it first.
-3. TV: Stremio → Settings → **Sync addons**. The track appears in the subtitles menu as **Romanian (AI)** (language Romanian).
+The TV app has no "add addon by URL" field; addons come from your Stremio account. Install **once**: the address never changes.
+1. On the Mac: `mise run addon:url` prints `https://stremio.nomadware.io:8443/<secret>/manifest.json`. The secret keeps strangers out; don't share the URL.
+2. Stremio desktop app (same account) → **Addons** → paste the URL into the search box → **Install**. Uninstall any older "Romanian (AI)" / "Companion" addon first.
+3. TV: Stremio → Settings → **Sync addons**. The track shows in the subtitles menu as **Romanian (AI)** (language Romanian).
+
+How it reaches the Mac: `stremio.nomadware.io` is a public DNS name for the Mac's **LAN** IP (Nomadware.io `infra/terraform/records.tf`), so only devices at home reach it; the certificate is a real Let's Encrypt one, renewed weekly. The HTTPS port serves nothing but the token-protected addon.
 
 ## 6. TV control from the host
 Each host pairs with the TV once (`mise run host:promote` does it; manually: `mise run tv -- pair`, then press **Allow** on the TV). The token is stored on the host (`<data dir>/tv-token`, mode 600), never in git; a new host pairs itself. Then:

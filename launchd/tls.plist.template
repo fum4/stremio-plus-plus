@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Weekly certificate check/renewal for the addon's HTTPS (lego renews only when due). Rendered by `mise run services:install`. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>io.github.fum4.stremio-companion.tls</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>@MISE@</string><string>exec</string><string>--cd</string><string>@REPO@</string>
+    <string>--</string><string>repo-secrets</string><string>exec</string><string>secrets/acme.env.age</string>
+    <string>--</string><string>scripts/tls-renew.sh</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+  <!-- Mondays 05:00; launchd runs a missed slot at the next wake. -->
+  <key>StartCalendarInterval</key><dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>5</integer><key>Minute</key><integer>0</integer></dict>
+  <key>StandardOutPath</key><string>@HOME@/Library/Logs/stremio-companion/tls.log</string>
+  <key>StandardErrorPath</key><string>@HOME@/Library/Logs/stremio-companion/tls.log</string>
+</dict>
+</plist>
