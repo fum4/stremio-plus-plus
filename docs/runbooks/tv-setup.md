@@ -11,6 +11,7 @@
 | Batman Wi-Fi MAC the router sees | `22:3c:5b:52:a1:8f` (macOS private address, *Fixed*; hardware MAC `84:2f:57:91:27:e5` is not used on this network) | 2026-10-21 |
 | Batman LAN IP | `192.168.1.132` — _DHCP reservation pending_ | 2026-10-21 |
 | Router | `192.168.1.1` | 2026-10-21 |
+| TV LAN IP / Wi-Fi MAC | `192.168.1.134` / `d0:c2:4e:13:e0:49` — _DHCP reservation pending_ | 2026-10-21 |
 
 ## 1. Give the Mac a fixed LAN IP
 The TV's server URL contains the Mac's IP, so it must never change.
@@ -37,6 +38,14 @@ The TV app has no "add addon by URL" field; addons come from your Stremio accoun
 1. The addon needs an HTTPS address. Until `nomadware.io` is set up: `mise run addon:tunnel` on the Mac prints `https://<random>.trycloudflare.com` (a new one every run).
 2. Stremio desktop app (same account) → **Addons** → paste `<https address>/manifest.json` into the search box → **Install**. If an older "Romanian (AI)" / "Companion" addon is listed, uninstall it first.
 3. TV: Stremio → Settings → **Sync addons**. The track appears in the subtitles menu as **Romanian (AI)** (language Romanian).
+
+## 6. TV control from the host
+Each host pairs with the TV once (`mise run host:promote` does it; manually: `mise run tv -- pair`, then press **Allow** on the TV). The token is stored on the host (`<data dir>/tv-token`, mode 600), never in git; a new host pairs itself. Then:
+- `mise run tv -- text '<string>'` types into the focused on-screen keyboard (server URL, addon search…).
+- `mise run tv -- key KEY_HOME KEY_DOWN KEY_ENTER …` sends remote keys.
+- Revoke: TV Settings → General → External Device Manager → Device Connection Manager → Device List → remove *stremio-companion*.
+
+The TV is at `TV_HOST` (`infra/env/companion.env`); give it a DHCP reservation too (Wi-Fi MAC `d0:c2:4e:13:e0:49`).
 
 ## When the Mac sleeps
 - Torrent playback through the Mac needs it awake, on power, on the LAN. Asleep → the TV can't play torrents until you wake it or [revert](#4-revert).

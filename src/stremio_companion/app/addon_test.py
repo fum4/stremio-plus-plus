@@ -41,6 +41,7 @@ def _client(tmp_path: Path) -> tuple[TestClient, SubtitleStore]:
         companion_port=11471,
         companion_data_dir=tmp_path,
         host_lan_ip=IPv4Address("192.168.1.132"),
+        tv_host=IPv4Address("192.168.1.134"),
         claude_cli=Path("/bin/false"),
         log_level="INFO",
         log_format="json",
