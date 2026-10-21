@@ -24,7 +24,7 @@ Owner wants Batman to control the TV for good (typing URLs with the remote is pa
 ## Set the TV's server URL automatically on host:promote · 2026-10-21 · M
 TV control works (pair/keys/text), but reaching Stremio → Settings → Streaming → server URL is a menu path we haven't mapped. First step: with the owner watching, record the key sequence from the Theater home screen, add `mise run tv -- set-server-url`, and call it from `host:promote` so a takeover needs no TV interaction at all.
 
-## Re-select the subtitle track automatically · 2026-10-21 · M
+## Re-select the subtitle track automatically · 2026-10-21 · M · **next**
 The player fetches the SRT once per selection, so cues generated later (after the 30 s lead-in) stay invisible until the viewer re-selects Romanian (AI). The host can now drive the TV (`mise run tv -- key …`): after the playhead's chunk lands, send the key sequence that re-selects the track. First step: record the sequence on Theater during playback and check it doesn't pause or visibly flash the menu.
 
 ## Steer away from weak 4K streams · 2026-10-21 · S

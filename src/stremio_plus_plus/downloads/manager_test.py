@@ -73,6 +73,21 @@ async def test_a_busy_server_skips_one_file_not_the_whole_sweep() -> None:
 
 
 @pytest.mark.asyncio
+async def test_the_next_episode_is_announced_even_when_already_downloaded() -> None:
+    fake = FakeServer(STATS, {(IH, 1): 1.0})
+    pinner = Pinner(fake.http, fake.client)
+    seen: list[tuple[str, int, int, str, int]] = []
+
+    def hook(info_hash: str, playing: int, index: int, name: str, length: int) -> None:
+        seen.append((info_hash, playing, index, name, length))
+
+    manager = DownloadManager(fake.client, pinner, lambda: 100 * GB, hook)
+    await manager(FileRequested(IH, 0, 0))
+    assert seen == [(IH, 0, 1, "Show.S01E02.mkv", 2 * GB)]
+    await pinner.close()
+
+
+@pytest.mark.asyncio
 async def test_engine_destroyed_drops_pins() -> None:
     manager, pinner, _ = _manager({}, free=100 * GB)
     await manager(FileRequested(IH, 1, 0))

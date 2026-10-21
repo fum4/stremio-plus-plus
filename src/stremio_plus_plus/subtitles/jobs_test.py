@@ -12,7 +12,7 @@ from stremio_plus_plus.subtitles import audio
 from stremio_plus_plus.subtitles.audio import Audio, AudioTrack
 from stremio_plus_plus.subtitles.cues import Cue
 from stremio_plus_plus.subtitles.jobs import SubtitleJobs
-from stremio_plus_plus.subtitles.scheduler import merged
+from stremio_plus_plus.subtitles.scheduler import Span, merged
 from stremio_plus_plus.subtitles.store import SubtitleStore
 from stremio_plus_plus.watch.events import FileRequested
 
@@ -205,3 +205,28 @@ async def test_the_next_window_is_transcribed_while_the_previous_is_translated(
     await _until(lambda: len(store.spans(IH, 2)) >= 1)
     runner.cancel()
     assert len(stt.offsets) >= 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("fake_audio")
+async def test_the_next_episode_is_generated_whole_after_the_playing_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    jobs, store = _jobs(tmp_path, FakeStt())
+    saved: list[tuple[int, float]] = []
+    save = store.save_span
+
+    def recording(ih: str, index: int, span: Span, cues: list[Cue]) -> None:
+        saved.append((index, span[0]))
+        save(ih, index, span, cues)
+
+    monkeypatch.setattr(store, "save_span", recording)
+    jobs.prepare_next(IH, 2, 3, "Show.S01E04.mkv", LENGTH)  # E03 has no subtitle job: ignored
+    jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
+    jobs.prepare_next(IH, 2, 3, "Show.S01E04.mkv", LENGTH)
+    runner = asyncio.create_task(jobs.run())
+    await _until(lambda: _complete(store, IH, 3))
+    runner.cancel()
+    order = [i for i, _ in saved]
+    assert order == sorted(order)  # every E03 window before any E04 one
+    assert next(start for i, start in saved if i == 3) == 0.0  # E04 from 0:00, not aimed ahead

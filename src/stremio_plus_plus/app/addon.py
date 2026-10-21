@@ -10,6 +10,7 @@ import secrets
 from typing import Any
 from urllib.parse import parse_qs
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 
@@ -23,6 +24,7 @@ def _require_token(request: Request, token: str) -> None:
         raise HTTPException(status_code=404)
 
 
+log = structlog.get_logger()
 addon_router = APIRouter(prefix="/{token}", dependencies=[Depends(_require_token)])
 lan_router = APIRouter()
 
@@ -40,7 +42,10 @@ MANIFEST: dict[str, Any] = {
     "catalogs": [],
 }
 PLACEHOLDER = [
-    Cue(0.0, 8.0, "Se generează subtitrarea… reselectează „Romanian (AI)” peste 1-2 minute.")
+    # Re-selecting the active track is a no-op on the TV: it has to be switched off and back on.
+    Cue(
+        0.0, 10.0, "Se generează subtitrarea… oprește subtitrarea și alege din nou „Romanian (AI)”."
+    )
 ]
 
 
@@ -81,12 +86,20 @@ async def srt(request: Request, info_hash: str, file_index: int) -> PlainTextRes
     jobs = _services(request).subtitles
     cues = jobs.cues(info_hash, file_index)
     waited = 0.0
-    # The player fetches this once per track selection: a few seconds' wait for the lead-in
-    # beats a placeholder the viewer has to re-select past.
+    # The player fetches this once per track selection (and auto-selects a remembered language
+    # as the episode loads): a few seconds' wait for the first window beats the placeholder.
     while not cues and jobs.generating(info_hash, file_index) and waited < FIRST_ANSWER_WAIT_S:
         await asyncio.sleep(0.5)
         waited += 0.5
         cues = jobs.cues(info_hash, file_index)
+    log.info(
+        "srt_served",
+        info_hash=info_hash,
+        file_index=file_index,
+        cues=len(cues),
+        until_s=round(cues[-1].end, 1) if cues else None,
+        waited_s=waited,
+    )
     return PlainTextResponse(
         render_srt(cues or PLACEHOLDER), media_type="application/x-subrip; charset=utf-8"
     )

@@ -30,7 +30,7 @@ v1 runs on Batman (MacBook Pro M4 Pro, 48 GB). It may move to an always-on box (
 | Disk space — Batman ~7 GiB free; the target host (owner's other Mac) has plenty | caching whole files and next episodes | cache = keep until disk pressure (server trims LRU only when the disk would overflow) + 7-day cleanup; manager keeps ≥ 3 GiB free |
 | TV can't decode the codec (HEVC/DV/DTS) and can't transcode | no playback | record TV model/codec support; server's HLS transcode path (ffmpeg on Batman) |
 | server.js changes behaviour on bump | pin breaks | pinned + sha256; re-verify [stremio-internals.md](research/stremio-internals.md) on every bump |
-| Subtitle file fetched once per track selection (verified: re-selecting re-fetches) | late-generated cues invisible until the next fetch | work ahead, delayed first answer, automated re-select via TV remote API (to verify) |
+| Subtitle file fetched once per track selection; the player also auto-selects a remembered language at load (fetch before generation starts), and re-selecting the *active* track does not re-fetch — switching off and back on does (verified on Theater 2026-10-21) | late-generated cues invisible until the next fetch | work ahead, delayed first answer, automated re-select via TV remote API (to verify) |
 | Subscription use for translation | account risk if it looks like abuse | personal use only, one call at a time, hourly cap, LAN-only addon; API key (~$0.05/episode) stays a one-setting switch |
 
 ## Not doing (v1)

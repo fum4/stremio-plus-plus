@@ -18,15 +18,22 @@ from stremio_plus_plus.server.client import StremioServer
 from stremio_plus_plus.watch.events import EngineDestroyed, Event, FileRequested
 
 log = structlog.get_logger()
+# (info_hash, playing file index, next file index, next file name, next file length)
+NextEpisodeHook = Callable[[str, int, int, str, int], None]
 
 
 class DownloadManager:
     def __init__(
-        self, server: StremioServer, pinner: Pinner, free_bytes: Callable[[], int]
+        self,
+        server: StremioServer,
+        pinner: Pinner,
+        free_bytes: Callable[[], int],
+        on_next_episode: NextEpisodeHook | None = None,
     ) -> None:
         self._server = server
         self._pinner = pinner
         self._free_bytes = free_bytes
+        self._on_next_episode = on_next_episode  # e.g. subtitles for it, ahead of time
 
     async def __call__(self, event: Event) -> None:
         if isinstance(event, EngineDestroyed):
@@ -43,7 +50,13 @@ class DownloadManager:
         ) < COMPLETE_PROGRESS:
             self._pinner.pin(event.info_hash, event.file_index)
         nxt = next_episode(engine, event.file_index)
-        if nxt is None or (event.info_hash, nxt.index) in self._pinner.pinned():
+        if nxt is None:
+            return
+        if self._on_next_episode is not None:
+            self._on_next_episode(
+                event.info_hash, event.file_index, nxt.index, nxt.name, nxt.length
+            )
+        if (event.info_hash, nxt.index) in self._pinner.pinned():
             return
         if (await self._server.file_progress(event.info_hash, nxt.index) or 0) >= COMPLETE_PROGRESS:
             return
