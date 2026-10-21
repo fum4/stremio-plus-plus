@@ -24,10 +24,11 @@ class Env(BaseSettings):
     companion_port: int = Field(ge=1, le=65535)
     companion_data_dir: Path
     host_lan_ip: IPv4Address
+    claude_cli: Path
     log_level: LogLevel
     log_format: LogFormat
 
-    @field_validator("stremio_server_log", "companion_data_dir", mode="before")
+    @field_validator("stremio_server_log", "companion_data_dir", "claude_cli", mode="before")
     @classmethod
     def _expand_home(cls, value: object) -> object:
         return Path(value).expanduser() if isinstance(value, str) else value

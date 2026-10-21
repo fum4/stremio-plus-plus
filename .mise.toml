@@ -72,6 +72,10 @@ run = "repo-secrets check"
 description = "Delete cached torrents unplayed for 7 days and evict LRU below the disk reserve (-- --dry-run to preview)"
 run = "python -m stremio_companion.downloads.cleanup_job"
 
+[tasks."models:fetch"]
+description = "Download the Whisper model (~1.6 GB, once per machine) into the Hugging Face cache"
+run = "python -c 'from huggingface_hub import snapshot_download; from stremio_companion.subtitles.constants import WHISPER_MODEL; print(snapshot_download(WHISPER_MODEL))'"
+
 [tasks.dev]
 description = "Run the companion in the foreground with reload"
 run = "uv run python -m stremio_companion"

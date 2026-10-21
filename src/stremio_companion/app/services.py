@@ -10,6 +10,8 @@ from stremio_companion.downloads.manager import DownloadManager
 from stremio_companion.downloads.pins import Pinner
 from stremio_companion.server.client import StremioServer
 from stremio_companion.state.plays import Plays
+from stremio_companion.subtitles.jobs import SubtitleJobs
+from stremio_companion.subtitles.store import SubtitleStore
 
 
 @dataclass(frozen=True)
@@ -21,3 +23,5 @@ class Services:
     plays: Plays
     pinner: Pinner
     downloads: DownloadManager
+    subtitle_store: SubtitleStore
+    subtitles: SubtitleJobs

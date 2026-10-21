@@ -17,6 +17,10 @@ def configure_logging(level: LogLevel, fmt: LogFormat) -> None:
         structlog.processors.add_log_level,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
     ]
+    # Exceptions become a structured "exception" field in JSON (pretty tracebacks on the console).
+    exceptions: list[structlog.types.Processor] = (
+        [structlog.processors.dict_tracebacks] if fmt == "json" else []
+    )
     structlog.configure(
         processors=[*shared, structlog.stdlib.ProcessorFormatter.wrap_for_formatter],
         logger_factory=structlog.stdlib.LoggerFactory(),
@@ -28,6 +32,7 @@ def configure_logging(level: LogLevel, fmt: LogFormat) -> None:
             foreign_pre_chain=shared,
             processors=[
                 structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+                *exceptions,
                 renderer,
             ],
         )

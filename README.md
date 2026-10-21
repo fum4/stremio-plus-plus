@@ -35,12 +35,14 @@ git clone https://github.com/fum4/stremio-companion ~/_work/stremio-companion
 cd ~/_work/stremio-companion
 mise trust && mise install
 mise run setup                 # Brewfile deps, venv, git hooks
+mise run models:fetch          # Whisper model, ~1.6 GB, once per machine
 mise run install-service       # fetch the pinned server.js, load the launchd agents
 ```
 
 - Logs: `~/Library/Logs/stremio-companion/{server,companion}.log`
 - Server data + cache: `~/Library/Application Support/stremio-companion/stremio-server/`
 - Stop / remove: `mise run uninstall-service`
+- Subtitles: the addon **"Romanian (AI)"** generates Romanian subtitles from the audio (Whisper on this Mac → Claude Haiku via your `claude` CLI login), starting where you are in the video; every generated line is stored, so a resume or rewatch is instant. Re-select the track to pull lines generated since.
 - Downloads: the playing file and the **next episode** of a season pack keep downloading in the background; a daily cleanup (04:30, or `mise run cleanup -- --dry-run`) deletes torrents unplayed for 7 days and keeps ≥ 3 GiB free.
 - Per-machine overrides (e.g. your LAN IP): `.env.local` (gitignored). Committed config: `infra/env/*.env`.
 

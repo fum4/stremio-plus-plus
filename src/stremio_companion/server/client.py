@@ -5,7 +5,12 @@ from typing import Any, cast
 
 import httpx
 
-from stremio_companion.server.constants import CACHE_SUBDIR, COMPANION_TAG, REQUEST_TIMEOUT_S
+from stremio_companion.server.constants import (
+    CACHE_SUBDIR,
+    COMPANION_TAG,
+    OPENSUB_HASH_TIMEOUT_S,
+    REQUEST_TIMEOUT_S,
+)
 from stremio_companion.server.models import Engine, TorrentFile
 
 
@@ -55,6 +60,17 @@ class StremioServer:
         resp.raise_for_status()
         values = cast(dict[str, Any], resp.json()["values"])
         return Path(str(values["cacheRoot"])) / CACHE_SUBDIR
+
+    async def opensub_hash(self, info_hash: str, file_index: int) -> str | None:
+        """OpenSubtitles hash computed by the server from the file (never trust a client's)."""
+        resp = await self._http.get(
+            f"{self._base}/opensubHash",
+            params={"videoUrl": self.file_url(info_hash, file_index)},
+            timeout=OPENSUB_HASH_TIMEOUT_S,
+        )
+        resp.raise_for_status()
+        result = cast(dict[str, Any] | None, resp.json().get("result"))
+        return str(result["hash"]) if result and result.get("hash") else None
 
     async def remove(self, info_hash: str) -> None:
         resp = await self._http.get(f"{self._base}/{info_hash}/remove", timeout=REQUEST_TIMEOUT_S)
