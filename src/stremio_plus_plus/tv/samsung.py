@@ -1,4 +1,8 @@
-"""Control the TV from the host: pair once (an "Allow" prompt on the TV), then send keys/text."""
+"""Samsung Tizen adapter: pair once (an "Allow" prompt on the TV), then send keys/text.
+
+Verified on the owner's UE43TU7092 (Tizen 5.5). Its wire behaviour predates the other adapters
+and must not change: messages come from samsung_protocol, one connection per command.
+"""
 
 import asyncio
 import ssl
@@ -8,8 +12,11 @@ from pathlib import Path
 
 from websockets.asyncio.client import ClientConnection, connect
 
+from stremio_plus_plus.tv.base import CodePrompt, TvRefusedError
 from stremio_plus_plus.tv.constants import CLIENT_NAME, KEY_DELAY_S, PAIR_TIMEOUT_S, WS_PORT
-from stremio_plus_plus.tv.protocol import (
+from stremio_plus_plus.tv.credentials import write_secret
+from stremio_plus_plus.tv.keys import SAMSUNG, native_keys
+from stremio_plus_plus.tv.samsung_protocol import (
     Connected,
     Refused,
     channel_url,
@@ -19,11 +26,7 @@ from stremio_plus_plus.tv.protocol import (
 )
 
 
-class TvRefusedError(Exception):
-    """The TV denied the pairing, or nobody pressed Allow in time."""
-
-
-class TvRemote:
+class SamsungRemote:
     def __init__(self, host: str, token_path: Path) -> None:
         self._host = host
         self._token_path = token_path
@@ -32,14 +35,15 @@ class TvRemote:
     def paired(self) -> bool:
         return self._token_path.is_file()
 
-    async def pair(self) -> None:
+    async def pair(self, ask_code: CodePrompt) -> None:
         """Connect, waiting up to a minute for Allow on the TV; the token is stored (mode 600)."""
+        del ask_code  # Samsung confirms with Allow on the TV, no code
         async with self._session():
             pass
 
     async def keys(self, *keys: str) -> None:
         async with self._session() as ws:
-            for key in keys:
+            for key in native_keys(keys, SAMSUNG, "samsung"):
                 await ws.send(key_message(key))
                 await asyncio.sleep(KEY_DELAY_S)
 
@@ -75,6 +79,4 @@ class TvRemote:
             raise TvRefusedError("no Allow on the TV within a minute") from exc
 
     def _save_token(self, token: str) -> None:
-        self._token_path.parent.mkdir(parents=True, exist_ok=True)
-        self._token_path.write_text(token)
-        self._token_path.chmod(0o600)
+        write_secret(self._token_path, token)

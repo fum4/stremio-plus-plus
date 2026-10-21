@@ -20,7 +20,7 @@ self-hosts; the project ships software, not a service.
 | Speech-to-text | mlx-whisper (Apple Silicon only) | provider: `mlx-whisper` (macOS arm64) · `faster-whisper` / `whisper.cpp` (Linux, Intel, NVIDIA) · optional cloud (OpenAI/Groq Whisper) |
 | Host OS | launchd plists, Homebrew | service backend: `launchd` (macOS) · `systemd` (Linux) · **Docker Compose** (any box, N100) |
 | HTTPS for the addon | `stremio.nomadware.io`, Cloudflare token, lego | modes: `own-domain` (any of lego's ~150 DNS providers) · `tailscale-funnel` / `cloudflare-tunnel` (no domain needed; public, token-protected) · `lan-http` (clients that allow plain http, e.g. desktop) |
-| TV control | Samsung Tizen WS, `TV_HOST` committed | optional plugins: `samsung-tizen` · later `lg-webos`, `android-tv` (adb) · `none` |
+| TV control | `TV_OS` adapters exist (`samsung` · `webos` · `androidtv` · `firetv`, [research](../research/tv-remote-protocols.md)); only Samsung verified on hardware; `TV_HOST`/`TV_OS` committed | per-user `TV_OS`/`TV_HOST` · add `none` · hardware-verify the other three |
 | Secrets | devbox `repo-secrets` + age key | secrets backend: OS keychain (macOS Keychain / libsecret) by default, env file (mode 600) for Docker, `repo-secrets` kept for the owner's own deployment |
 | Identity strings | `io.github.fum4.*` labels, Batman, `fum4/devbox` engine | neutral names; owner-specific bits move to the owner's deployment profile |
 | Config location | `infra/env/companion.env` + `.env.local` in the repo | one user config file outside the repo: `~/.config/stremio-plus-plus/config.toml` (XDG; `%APPDATA%` later) |

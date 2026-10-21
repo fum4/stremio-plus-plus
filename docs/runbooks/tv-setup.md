@@ -42,10 +42,19 @@ The TV app has no "add addon by URL" field; addons come from your Stremio accoun
 How it reaches the Mac: `stremio.nomadware.io` is a public DNS name for the Mac's **LAN** IP (Nomadware.io `infra/terraform/records.tf`), so only devices at home reach it; the certificate is a real Let's Encrypt one, renewed weekly. The HTTPS port serves nothing but the token-protected addon.
 
 ## 6. TV control from the host
-Each host pairs with the TV once (`mise run host:promote` does it; manually: `mise run tv -- pair`, then press **Allow** on the TV). The token is stored on the host (`<data dir>/tv-token`, mode 600), never in git; a new host pairs itself. Then:
-- `mise run tv -- text '<string>'` types into the focused on-screen keyboard (server URL, addon search…).
-- `mise run tv -- key KEY_HOME KEY_DOWN KEY_ENTER …` sends remote keys.
-- Revoke: TV Settings → General → External Device Manager → Device Connection Manager → Device List → remove *stremio++*.
+`TV_OS` in `infra/env/companion.env` picks the adapter (`src/stremio_plus_plus/tv/`); `TV_HOST` is the TV's IP. Each host pairs once (`mise run host:promote` does it; manually: `mise run tv -- pair`). Credentials stay on the host under `<data dir>/`, mode 600, never in git; a new host pairs itself. Protocol details and sources: [docs/research/tv-remote-protocols.md](../research/tv-remote-protocols.md).
+
+| `TV_OS` | Verified on a real TV | Before pairing (TV side) | Pairing gesture | Credential file | Revoke on the TV |
+|---|---|---|---|---|---|
+| `samsung` (this TV) | ✅ UE43TU7092, Tizen 5.5 | nothing | press **Allow** | `tv-token` | Settings → General → External Device Manager → Device Connection Manager → Device List → remove *stremio++* |
+| `webos` (LG) | ❌ untested | nothing (TV on, same LAN) | accept the **"allow this device"** prompt within a minute | `tv-webos-client-key` | _unverified:_ no per-device list is documented; a factory reset clears all paired clients |
+| `androidtv` (Google TV, Sony, Philips, TCL, Shield…) | ❌ untested | nothing (the *Android TV Remote Service* is preinstalled) | type the **6-character code** the TV shows at the `Code shown on the TV:` prompt | `tv-androidtv-cert.pem`, `tv-androidtv-key.pem` | _unverified:_ Settings → Apps → *Android TV Remote Service* → Clear data (forgets all paired remotes) |
+| `firetv` (Fire OS) | ❌ untested | Settings → My Fire TV → Developer options → **ADB debugging ON** (unlock Developer options: About → click the device name 7×). **Record this as a TV change; revert = ADB debugging OFF** | tick **Always allow from this computer**, press OK | `tv-firetv-adbkey` (+ `.pub`) | Developer options → ADB debugging OFF (or *Revoke USB debugging authorisations*) |
+
+Then:
+- `mise run tv -- text '<string>'` types into the focused on-screen keyboard (server URL, addon search…). Fire TV: printable ASCII only.
+- `mise run tv -- key HOME DOWN ENTER …` sends remote keys. Common names on every OS: `HOME BACK UP DOWN LEFT RIGHT ENTER PLAY PAUSE PLAY_PAUSE STOP REWIND FAST_FORWARD VOLUME_UP VOLUME_DOWN MUTE MENU INFO` (Samsung and webOS have no `PLAY_PAUSE` toggle: use `PLAY`/`PAUSE`). Any other name is sent as the OS's native key (`KEY_HOME` on Samsung, `HOME` on webOS, `KEYCODE_HOME` on Android TV / Fire TV), so existing `KEY_…` scripts keep working.
+- `mise run tv -- status` exits 0 if this host holds credentials (no network check); `host:doctor` also checks the TV's control port for `TV_OS`.
 
 The TV is at `TV_HOST` (`infra/env/companion.env`); give it a DHCP reservation too (Wi-Fi MAC `d0:c2:4e:13:e0:49`).
 

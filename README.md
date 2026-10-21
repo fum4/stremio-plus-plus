@@ -67,6 +67,7 @@ Then point the TV at it and install the addon: [docs/runbooks/tv-setup.md](docs/
 | `mise run host:demote` | Stop being the host: removes every agent (data stays) |
 | `mise run cleanup -- --dry-run` | Shows what the daily cleanup would delete |
 | `mise run server:configure` | Re-applies the server settings (cache, torrent profile, HTTPS for the LAN IP) |
+| `mise run tv -- pair\|status\|key HOME DOWN ENTER\|text '<s>'` | Controls the TV from the Mac (`TV_OS` = samsung · webos · androidtv · firetv; only Samsung is tested on a real TV): [TV runbook §6](docs/runbooks/tv-setup.md#6-tv-control-from-the-host) |
 | `mise run addon:url` | The addon URL to install in Stremio (`https://stremio.nomadware.io:8443/<secret>/manifest.json`; keep it private) |
 | `mise run tls:renew` | Get/renew the addon's Let's Encrypt certificate (a weekly agent does this automatically) |
 | `mise tasks` | Everything else |

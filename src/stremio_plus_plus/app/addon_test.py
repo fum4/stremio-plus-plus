@@ -51,6 +51,7 @@ def _client_and_jobs(tmp_path: Path) -> tuple[TestClient, SubtitleStore, Subtitl
         companion_data_dir=tmp_path,
         host_lan_ip=IPv4Address("192.168.1.132"),
         tv_host=IPv4Address("192.168.1.134"),
+        tv_os="samsung",
         addon_domain="stremio.nomadware.io",
         addon_https_port=8443,
         addon_token=TOKEN,

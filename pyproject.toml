@@ -7,6 +7,9 @@ authors = [
 ]
 requires-python = ">=3.14.8"
 dependencies = [
+    "adb-shell[async]==0.4.4",
+    "aiowebostv==0.10.0",
+    "androidtvremote2==0.3.2",
     "fastapi>=0.156.4",
     "httpx>=0.28.1",
     "mlx-whisper>=0.4.3",

@@ -13,6 +13,7 @@ VALID = {
     "COMPANION_DATA_DIR": "/tmp/companion-data",
     "HOST_LAN_IP": "192.168.1.132",
     "TV_HOST": "192.168.1.134",
+    "TV_OS": "samsung",
     "CLAUDE_CLI": "~/.local/bin/claude",
     "ADDON_DOMAIN": "stremio.nomadware.io",
     "ADDON_HTTPS_PORT": "8443",
@@ -69,5 +70,11 @@ def test_fails_on_any_missing_value(env: pytest.MonkeyPatch, missing: str) -> No
 )
 def test_fails_on_invalid_value(env: pytest.MonkeyPatch, key: str, bad: str) -> None:
     _set_all(env, **{key: bad})
+    with pytest.raises(ValidationError):
+        load_env()
+
+
+def test_rejects_an_unknown_tv_os(env: pytest.MonkeyPatch) -> None:
+    _set_all(env, TV_OS="roku")
     with pytest.raises(ValidationError):
         load_env()

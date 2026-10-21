@@ -60,8 +60,17 @@ local_answer="$(dig +short "$ADDON_DOMAIN" | tail -1)"
 launchctl print "gui/$(id -u)/io.github.fum4.stremio-plus-plus.tls" >/dev/null 2>&1 && ok "weekly certificate renewal agent loaded" || bad "tls agent missing" "mise run services:install tls"
 
 echo "TV"
-if nc -z -G 3 "$TV_HOST" 8002 2>/dev/null; then ok "TV reachable ($TV_HOST)"; else warn "TV not reachable at $TV_HOST" "TV off/asleep, or its IP changed (TV_HOST in infra/env/companion.env)"; fi
-python -m stremio_plus_plus.tv.cli status >/dev/null 2>&1 && ok "this host is paired with the TV" || bad "not paired with the TV" "mise run tv -- pair (press Allow on the TV)"
+# Control port and pairing gesture per TV_OS (src/stremio_plus_plus/tv/; only samsung is hardware-verified).
+tv_os="${TV_OS:-samsung}"
+case "$tv_os" in
+  samsung) tv_port=8002 tv_pair="press Allow on the TV" ;;
+  webos) tv_port=3000 tv_pair="accept the prompt on the TV" ;;
+  androidtv) tv_port=6466 tv_pair="type the code the TV shows" ;;
+  firetv) tv_port=5555 tv_pair="Developer options → ADB debugging ON first, then Always allow + OK" ;;
+  *) tv_port=0 tv_pair="" ; bad "TV_OS=$tv_os is not samsung|webos|androidtv|firetv" "fix TV_OS in infra/env/companion.env" ;;
+esac
+if nc -z -G 3 "$TV_HOST" "$tv_port" 2>/dev/null; then ok "TV reachable ($tv_os at $TV_HOST:$tv_port)"; else warn "TV not reachable at $TV_HOST:$tv_port ($tv_os)" "TV off/asleep, its IP changed (TV_HOST), or TV_OS is wrong (infra/env/companion.env)"; fi
+python -m stremio_plus_plus.tv.cli status >/dev/null 2>&1 && ok "this host is paired with the TV" || bad "not paired with the TV" "mise run tv -- pair ($tv_pair)"
 
 echo "Data"
 if python -c 'from huggingface_hub import try_to_load_from_cache as t; from stremio_plus_plus.subtitles.constants import WHISPER_MODEL as m; import sys; sys.exit(0 if isinstance(t(m, "config.json"), str) else 1)' 2>/dev/null; then
