@@ -5,6 +5,7 @@
     id: string;
     label: string;
     icon: Component;
+    badge?: string;
   }
 </script>
 
@@ -50,6 +51,7 @@
       <a href="#{item.id}" class:active={item.id === current}>
         <Icon size={17} strokeWidth={2} />
         {item.label}
+        {#if item.badge}<span class="badge">{item.badge}</span>{/if}
       </a>
     {/each}
   </nav>
@@ -156,6 +158,16 @@
 
   nav a.active {
     color: var(--text);
+  }
+
+  .badge {
+    margin-left: auto;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--amber);
+    background: rgba(251, 191, 119, 0.1);
   }
 
   nav a.active :global(svg) {

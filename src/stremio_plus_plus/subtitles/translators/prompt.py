@@ -6,13 +6,30 @@ The model sees numbered lines only, never timings; the reply is a JSON object of
 
 from typing import Any, cast
 
-SYSTEM_PROMPT = (
-    "You translate English TV subtitles into natural, idiomatic Romanian as a professional "
-    "subtitler would: correct diacritics (ă â î ș ț), concise, colloquial where the speech is, "
-    "keep names, keep profanity at the same strength. You get numbered lines; return exactly one "
-    "translation per id, same ids, no merging or splitting. Lines given as context are earlier, "
-    "already-translated subtitles: use them only for continuity."
+TASK = "You translate English TV subtitles into Romanian, with correct diacritics (ă â î ș ț). "
+TONE = (
+    "Write natural, idiomatic Romanian as a professional subtitler would: concise, colloquial "
+    "where the speech is, keep names, keep profanity at the same strength. "
 )
+# A chosen style replaces TONE: next to "as a professional subtitler would" the model plays safe.
+STYLE = (
+    "Voice: the viewer chose a style for these subtitles. Apply it strongly and consistently to "
+    "every line (word choice, slang, rhythm, attitude) so it is unmistakable, while keeping each "
+    "line's meaning and keeping it short enough to read. The style: {style}\n"
+)
+FORMAT = (
+    "You get numbered lines; return exactly one translation per id, same ids, no merging or "
+    "splitting. Lines given as context are earlier, already-translated subtitles: use them only "
+    "for continuity."
+)
+
+
+def system_prompt(style: str) -> str:
+    voice = STYLE.format(style=style.strip()) if style.strip() else TONE
+    return TASK + voice + FORMAT
+
+
+SYSTEM_PROMPT = system_prompt("")
 SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {

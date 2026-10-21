@@ -12,17 +12,18 @@ echo "Tools"
 for bin in ffmpeg ffprobe age gh; do
   command -v "$bin" >/dev/null && ok "$bin" || bad "$bin missing" "mise run setup (Brewfile)"
 done
-[ -x "$claude_bin" ] && ok "claude CLI at $claude_bin" || bad "claude CLI not found at ${claude_bin:-<unset>}" "install Claude Code, or set CLAUDE_CLI in .env.local"
+[ -x "$claude_bin" ] && ok "claude CLI at $claude_bin" || warn "claude CLI not found at ${claude_bin:-<unset>}" "only needed for the Claude-subscription translator; or set CLAUDE_CLI in .env.local"
 if [ -x "$claude_bin" ] && "$claude_bin" auth status 2>/dev/null | grep -q '"loggedIn": true'; then
   ok "claude CLI logged in (subscription translates the subtitles)"
 else
-  bad "claude CLI not logged in" "run: claude, then /login"
+  warn "claude CLI not logged in" "only needed for the Claude-subscription translator: run claude, then /login"
 fi
 
 echo "Network"
 current_ip="$(ipconfig getifaddr en0 2>/dev/null || true)"
 if [ -z "${HOST_LAN_IP:-}" ]; then
-  bad "HOST_LAN_IP unset" "add HOST_LAN_IP=<this Mac's reserved LAN IP> to .env.local"
+  ok "LAN IP ${current_ip:-?} (detected; a DHCP reservation keeps the TV's URLs stable)"
+  HOST_LAN_IP="$current_ip"
 elif [ "$current_ip" != "$HOST_LAN_IP" ]; then
   bad "HOST_LAN_IP=$HOST_LAN_IP but Wi-Fi has ${current_ip:-no IP}" "fix the DHCP reservation or .env.local, then mise run server:configure and update the TV URL"
 else
@@ -48,39 +49,57 @@ fi
 launchctl print "gui/$(id -u)/io.github.fum4.stremio-plus-plus.cleanup" >/dev/null 2>&1 && ok "daily cleanup agent loaded" || bad "cleanup agent missing" "mise run services:install cleanup"
 
 echo "Addon (HTTPS)"
-cert="${COMPANION_DATA_DIR/#\~/$HOME}/tls/certificates/$ADDON_DOMAIN.crt"
-if [ -f "$cert" ]; then
-  end="$(openssl x509 -noout -enddate -in "$cert" | cut -d= -f2)"
-  days=$(( ( $(date -j -f '%b %e %T %Y %Z' "$end" +%s) - $(date +%s) ) / 86400 ))
-  [ "$days" -ge 14 ] && ok "certificate for $ADDON_DOMAIN valid $days more days" || bad "certificate expires in $days days" "mise run tls:renew (weekly agent: services:install tls)"
+if [ -z "${ADDON_DOMAIN:-}" ]; then
+  # No own domain: the companion serves the addon under the streaming server's stremio.rocks
+  # certificate (tls/stremio_cert.py) and renews it itself.
+  manifest="$(curl -sf -m3 -H 'X-Stremio-Plus-Plus: 1' "http://127.0.0.1:$COMPANION_PORT/api/status" | python3 -c 'import json,sys; print(json.load(sys.stdin)["addon"]["manifest_url"] or "")' 2>/dev/null)"
+  if [ -z "$manifest" ]; then
+    bad "addon has no HTTPS certificate yet" "open the setup at http://${HOST_LAN_IP:-<host>}:$COMPANION_PORT/ (step: streaming server), or mise run server:configure"
+  else
+    host_port="${manifest#https://}"; host_port="${host_port%%/*}"
+    code="$(curl -s -o /dev/null -w '%{http_code}' -m5 --resolve "$host_port:${HOST_LAN_IP:-127.0.0.1}" "$manifest")"
+    [ "$code" = 200 ] && ok "addon answers over HTTPS at ${host_port} (install URL: Install page of the UI)" || bad "addon over HTTPS returned ${code}" "mise run services:restart companion; companion.log"
+  fi
 else
-  bad "no certificate for $ADDON_DOMAIN" "mise run tls:renew"
+  cert="${COMPANION_DATA_DIR/#\~/$HOME}/tls/certificates/$ADDON_DOMAIN.crt"
+  if [ -f "$cert" ]; then
+    end="$(openssl x509 -noout -enddate -in "$cert" | cut -d= -f2)"
+    days=$(( ( $(date -j -f '%b %e %T %Y %Z' "$end" +%s) - $(date +%s) ) / 86400 ))
+    [ "$days" -ge 14 ] && ok "certificate for $ADDON_DOMAIN valid $days more days" || bad "certificate expires in $days days" "mise run tls:renew (weekly agent: services:install tls)"
+  else
+    bad "no certificate for $ADDON_DOMAIN" "mise run tls:renew"
+  fi
+  resolved="$(dig +short "$ADDON_DOMAIN" @1.1.1.1 | tail -1)"
+  [ "$resolved" = "${HOST_LAN_IP:-}" ] && ok "$ADDON_DOMAIN → $resolved (this host)" || bad "$ADDON_DOMAIN → ${resolved:-nothing}, not ${HOST_LAN_IP:-?}" "update the stremio record in Nomadware.io infra/terraform/records.tf"
+  # --resolve: test the service itself, independent of this Mac's resolver cache (Tailscale MagicDNS
+  # can hold a stale answer for a while after DNS changes).
+  code="$(curl -s -o /dev/null -w '%{http_code}' -m5 --resolve "$ADDON_DOMAIN:$ADDON_HTTPS_PORT:${resolved:-127.0.0.1}" "https://$ADDON_DOMAIN:$ADDON_HTTPS_PORT/${ADDON_TOKEN:-x}/manifest.json")"
+  [ "$code" = 200 ] && ok "addon answers over HTTPS (mise run addon:url for the install URL)" || bad "addon over HTTPS returned ${code}" "mise run services:restart companion; companion.log"
+  local_answer="$(dig +short "$ADDON_DOMAIN" | tail -1)"
+  [ "$local_answer" = "$resolved" ] || warn "this Mac's resolver answers '${local_answer:-nothing}' for $ADDON_DOMAIN" "stale cache (Tailscale MagicDNS); clears on its own, or: sudo killall -HUP mDNSResponder"
+  launchctl print "gui/$(id -u)/io.github.fum4.stremio-plus-plus.tls" >/dev/null 2>&1 && ok "weekly certificate renewal agent loaded" || bad "tls agent missing" "mise run services:install tls"
+
 fi
-resolved="$(dig +short "$ADDON_DOMAIN" @1.1.1.1 | tail -1)"
-[ "$resolved" = "${HOST_LAN_IP:-}" ] && ok "$ADDON_DOMAIN → $resolved (this host)" || bad "$ADDON_DOMAIN → ${resolved:-nothing}, not ${HOST_LAN_IP:-?}" "update the stremio record in Nomadware.io infra/terraform/records.tf"
-# --resolve: test the service itself, independent of this Mac's resolver cache (Tailscale MagicDNS
-# can hold a stale answer for a while after DNS changes).
-code="$(curl -s -o /dev/null -w '%{http_code}' -m5 --resolve "$ADDON_DOMAIN:$ADDON_HTTPS_PORT:${resolved:-127.0.0.1}" "https://$ADDON_DOMAIN:$ADDON_HTTPS_PORT/${ADDON_TOKEN:-x}/manifest.json")"
-[ "$code" = 200 ] && ok "addon answers over HTTPS (mise run addon:url for the install URL)" || bad "addon over HTTPS returned ${code}" "mise run services:restart companion; companion.log"
-local_answer="$(dig +short "$ADDON_DOMAIN" | tail -1)"
-[ "$local_answer" = "$resolved" ] || warn "this Mac's resolver answers '${local_answer:-nothing}' for $ADDON_DOMAIN" "stale cache (Tailscale MagicDNS); clears on its own, or: sudo killall -HUP mDNSResponder"
-launchctl print "gui/$(id -u)/io.github.fum4.stremio-plus-plus.tls" >/dev/null 2>&1 && ok "weekly certificate renewal agent loaded" || bad "tls agent missing" "mise run services:install tls"
 
 echo "TV"
-# Control port and pairing gesture per TV_OS (src/stremio_plus_plus/tv/; only samsung is hardware-verified).
-tv_os="${TV_OS:-samsung}"
-case "$tv_os" in
-  samsung) tv_port=8002 tv_pair="press Allow on the TV" ;;
-  webos) tv_port="3000 3001" tv_pair="accept the prompt on the TV" ;;  # ws, or wss only on newer firmware
-  androidtv) tv_port=6466 tv_pair="type the code the TV shows" ;;
-  firetv) tv_port=5555 tv_pair="Developer options → ADB debugging ON first, then Always allow + OK" ;;
-  *) tv_port=0 tv_pair="" ; bad "TV_OS=$tv_os is not samsung|webos|androidtv|firetv" "fix TV_OS in infra/env/companion.env" ;;
-esac
-tv_up=""
-for p in $tv_port; do nc -z -G 3 "$TV_HOST" "$p" 2>/dev/null && { tv_up=$p; break; }; done
-if [ -n "$tv_up" ]; then ok "TV reachable ($tv_os at $TV_HOST:$tv_up)"; else warn "TV not reachable at $TV_HOST:$tv_port ($tv_os)" "TV off/asleep, its IP changed (TV_HOST), or TV_OS is wrong (infra/env/companion.env)"; fi
-python -m stremio_plus_plus.tv.cli status >/dev/null 2>&1 && ok "this host is paired with the TV" || bad "not paired with the TV" "mise run tv -- pair ($tv_pair)"
+if [ -z "${TV_HOST:-}" ]; then
+  ok "no TV to control configured (optional: TV_HOST + TV_OS in .env.local, for mise run tv)"
+else
+  # Control port and pairing gesture per TV_OS (src/stremio_plus_plus/tv/; only samsung is hardware-verified).
+  tv_os="${TV_OS:-samsung}"
+  case "$tv_os" in
+    samsung) tv_port=8002 tv_pair="press Allow on the TV" ;;
+    webos) tv_port="3000 3001" tv_pair="accept the prompt on the TV" ;;  # ws, or wss only on newer firmware
+    androidtv) tv_port=6466 tv_pair="type the code the TV shows" ;;
+    firetv) tv_port=5555 tv_pair="Developer options → ADB debugging ON first, then Always allow + OK" ;;
+    *) tv_port=0 tv_pair="" ; bad "TV_OS=$tv_os is not samsung|webos|androidtv|firetv" "fix TV_OS in infra/env/companion.env" ;;
+  esac
+  tv_up=""
+  for p in $tv_port; do nc -z -G 3 "$TV_HOST" "$p" 2>/dev/null && { tv_up=$p; break; }; done
+  if [ -n "$tv_up" ]; then ok "TV reachable ($tv_os at $TV_HOST:$tv_up)"; else warn "TV not reachable at $TV_HOST:$tv_port ($tv_os)" "TV off/asleep, its IP changed (TV_HOST), or TV_OS is wrong (infra/env/companion.env)"; fi
+  python -m stremio_plus_plus.tv.cli status >/dev/null 2>&1 && ok "this host is paired with the TV" || bad "not paired with the TV" "mise run tv -- pair ($tv_pair)"
 
+fi
 echo "Data"
 # The model named in config.toml (subtitles.speech.model).
 if python -c 'import os, sys; from pathlib import Path; from huggingface_hub import try_to_load_from_cache as t; from stremio_plus_plus.config.settings_file import SettingsFile; m = SettingsFile(Path(os.environ["CONFIG_DIR"]).expanduser()).settings.subtitles.speech.model; sys.exit(0 if isinstance(t(m, "config.json"), str) else 1)' 2>/dev/null; then

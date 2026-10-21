@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { fade, fly } from "svelte/transition";
-  import { CircleAlert, Gauge, HardDriveDownload, Link2, Subtitles } from "@lucide/svelte";
+  import { CircleAlert, Gauge, HardDriveDownload, Link2, ListChecks, Subtitles } from "@lucide/svelte";
   import Sidebar, { type NavItem } from "./lib/components/Sidebar.svelte";
   import SaveBar from "./lib/components/SaveBar.svelte";
   import Toasts from "./lib/components/Toasts.svelte";
@@ -10,15 +10,24 @@
   import SubtitlesPage from "./pages/Subtitles.svelte";
   import Downloads from "./pages/Downloads.svelte";
   import Install from "./pages/Install.svelte";
+  import Setup from "./pages/Setup.svelte";
 
   const pages = {
     overview: { label: "Overview", icon: Gauge, component: Overview },
     subtitles: { label: "Subtitles", icon: Subtitles, component: SubtitlesPage },
     downloads: { label: "Downloads", icon: HardDriveDownload, component: Downloads },
     install: { label: "Install", icon: Link2, component: Install },
+    setup: { label: "Setup", icon: ListChecks, component: Setup },
   } as const;
   type PageId = keyof typeof pages;
-  const nav: NavItem[] = Object.entries(pages).map(([id, p]) => ({ id, label: p.label, icon: p.icon }));
+  const nav: NavItem[] = $derived(
+    Object.entries(pages).map(([id, p]) => ({
+      id,
+      label: p.label,
+      icon: p.icon,
+      badge: id === "setup" && app.setup && !app.setup.completed ? "to do" : undefined,
+    })),
+  );
 
   const fromHash = (): PageId => {
     const id = location.hash.slice(1);
@@ -29,7 +38,13 @@
   const Page = $derived(pages[page].component);
 
   onMount(() => {
-    app.start().catch((e: unknown) => (failed = String(e)));
+    app
+      .start()
+      .then(() => {
+        // First run: open the setup instead of an empty dashboard.
+        if (app.setup && !app.setup.completed && !location.hash) location.hash = "#setup";
+      })
+      .catch((e: unknown) => (failed = String(e)));
   });
 </script>
 

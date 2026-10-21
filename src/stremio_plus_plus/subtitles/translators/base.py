@@ -77,7 +77,9 @@ class LlmTranslator:
         context_cues: int,
         stats: TranslatorStats,
         lock: asyncio.Lock | None = None,  # shared across rebuilds: one call at a time, always
+        system: str = SYSTEM_PROMPT,
     ) -> None:
+        self._system = system
         self._backend = backend
         self._cap = cap
         self._context_cues = context_cues
@@ -102,7 +104,7 @@ class LlmTranslator:
             await self._cap.acquire()
             t0 = time.monotonic()
             try:
-                out = await self._backend.complete(SYSTEM_PROMPT, prompt, SCHEMA)
+                out = await self._backend.complete(self._system, prompt, SCHEMA)
             except TranslatorConfigError as exc:
                 self._stats.failures += 1
                 self._stats.last_error = str(exc)

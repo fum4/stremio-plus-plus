@@ -8,7 +8,7 @@ import httpx
 from pydantic import AnyHttpUrl
 
 from stremio_plus_plus.app.picker import Picker
-from stremio_plus_plus.app.services import Services
+from stremio_plus_plus.app.services import HostInfo, Services
 from stremio_plus_plus.config.env import Env
 from stremio_plus_plus.config.settings_file import SettingsFile
 from stremio_plus_plus.downloads.manager import DownloadManager
@@ -19,10 +19,14 @@ from stremio_plus_plus.state.plays import Plays
 from stremio_plus_plus.stream.sessions import Sessions
 from stremio_plus_plus.subtitles.cues import Cue
 from stremio_plus_plus.subtitles.jobs import SubtitleJobs
+from stremio_plus_plus.subtitles.model_cache import ModelDownload
 from stremio_plus_plus.subtitles.store import SubtitleStore
 from stremio_plus_plus.subtitles.translators.registry import ConfiguredTranslator
+from stremio_plus_plus.tls.addon import AddonTls
 
 TOKEN = "k" * 32
+DOMAIN = "192-168-1-132.519b6502d940.stremio.rocks"
+TLS = AddonTls("stremio", DOMAIN, Path("cert.pem"), Path("key.pem"))
 
 
 class NoStt:
@@ -37,6 +41,8 @@ def make_services(tmp_path: Path, handler: Callable[[httpx.Request], httpx.Respo
         companion_host="0.0.0.0",
         companion_port=11471,
         companion_data_dir=tmp_path,
+        stremio_server_data_dir=tmp_path / "server",
+        stremio_server_settings=tmp_path / "server-settings.json",
         config_dir=tmp_path / "config",
         ui_dir=tmp_path / "ui",
         host_lan_ip=IPv4Address("192.168.1.132"),
@@ -58,6 +64,7 @@ def make_services(tmp_path: Path, handler: Callable[[httpx.Request], httpx.Respo
     translator = ConfiguredTranslator(settings_file, env.claude_cli)
     return Services(
         env=env,
+        host=HostInfo(IPv4Address("192.168.1.132"), TOKEN, 8443, tls=TLS),
         settings_file=settings_file,
         http=http,
         db=db,
@@ -72,4 +79,5 @@ def make_services(tmp_path: Path, handler: Callable[[httpx.Request], httpx.Respo
         picker=Picker(http, server, tmp_path),
         sessions=Sessions(tmp_path / "hls"),
         playback_handlers=[],
+        model_download=ModelDownload(),
     )

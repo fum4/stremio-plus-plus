@@ -20,20 +20,20 @@ No modified TV app: everything works through two settings in the stock Stremio a
 ```
 Samsung TV — Stremio app ("Stremio Theater")
   │  server URL:  https://<mac-ip-dashed>.519b6502d940.stremio.rocks:12470   (HTTPS: the TV refuses plain http)
-  │  addon:       "Stremio++"  https://stremio.nomadware.io:8443/<secret>/manifest.json
-  │               (public name → the Mac's LAN IP, Let's Encrypt certificate; installed once from the desktop app)
+  │  addon:       "Stremio++"  https://<mac-ip-dashed>.519b6502d940.stremio.rocks:8443/<secret>/manifest.json
+  │               (the streaming server's own certificate, reused; or your own domain; installed once per account)
   ▼
 Mac (launchd agents, all from this repo)
   ├─ Stremio streaming server   official server.js (pinned), node        :11470 http · :12470 https
   │     cache kept until the companion deletes it; "ultra fast" torrent profile
-  ├─ companion                  Python / FastAPI                :11471 http (LAN) · :8443 https (addon)
+  ├─ companion                  Python / FastAPI                :11471 http (LAN: settings UI) · :8443 https (addon)
   │     ├─ watches the server log → which file the TV plays, where it seeks
   │     ├─ stream: the "Stremio++" source: best release from your addons, repackaged as HLS
   │     │   (ffmpeg, video copied) with the subtitle track inside, switched from the menu
   │     ├─ downloads: keeps the playing file + next episode downloading
   │     └─ subtitles: audio → Whisper (MLX) → Claude Haiku (`claude` CLI, your plan) → SRT, stored in SQLite
   ├─ cleanup (daily 04:30)      torrents unplayed for 7 days; LRU when disk < 3 GiB
-  └─ tls (weekly)               renews the addon certificate (lego, DNS-01 via Cloudflare)
+  └─ tls (weekly, own domain only)  renews the addon certificate (lego, DNS-01 via Cloudflare)
 ```
 
 Why it's built this way, with evidence from the server.js bundle: [docs/research/stremio-internals.md](docs/research/stremio-internals.md). Tool choices and benchmarks: [docs/research/subtitle-stack.md](docs/research/subtitle-stack.md).
@@ -50,22 +50,24 @@ If the Mac is asleep or off, torrents won't play. Switch the TV back to its own 
 
 ## Install on a Mac
 
-Needs Homebrew, `brew install mise gh`, Claude Code logged in (`claude`, then `/login`), and a fixed LAN IP for the Mac (router DHCP reservation, see the [TV runbook](docs/runbooks/tv-setup.md#1-give-the-mac-a-fixed-lan-ip)).
+An Apple Silicon Mac that stays on, on the same network as the TV. Needs [Homebrew](https://brew.sh), then:
 
 ```bash
-git clone https://github.com/fum4/stremio-plus-plus ~/_work/stremio-plus-plus
-cd ~/_work/stremio-plus-plus
+brew install mise git
+git clone https://github.com/fum4/stremio-plus-plus ~/stremio-plus-plus && cd ~/stremio-plus-plus
 mise trust && mise install
-echo "HOST_LAN_IP=<the Mac's reserved LAN IP>" > .env.local
-mise run host:promote   # this Mac becomes the Stremio host: Brewfile, venv, hooks, Whisper model (~1.6 GB), launchd agents, doctor
+mise run install        # dependencies, the settings UI, background services; prints a link
 ```
 
-Then point the TV at it and install the addon: [docs/runbooks/tv-setup.md](docs/runbooks/tv-setup.md). Moving to another Mac: [docs/runbooks/migrate-host.md](docs/runbooks/migrate-host.md).
+Open the link it prints (`http://<this-mac>:11471/`, from any device at home) and follow the setup: it checks the Mac, sets up the streaming server for the TV, lets you pick the translator (your Claude subscription or an Anthropic API key) and try it, downloads the speech model, and walks you through the two steps on the TV and in Stremio. No domain, DNS or certificate work: the addon reuses the certificate Stremio issues for your server.
+
+Tip: give the Mac a fixed address in your router (DHCP reservation); the URL on the TV contains it. Settings live in `~/.config/stremio-plus-plus/config.toml`: edit them in the UI, by hand, or ask an agent. Moving to another Mac: [docs/runbooks/migrate-host.md](docs/runbooks/migrate-host.md). The owner's own setup (own domain, TV control, encrypted token) uses `mise run host:promote` with the values in `.env.local`: [docs/runbooks/tv-setup.md](docs/runbooks/tv-setup.md).
 
 ## Everyday commands
 
 | Command | Does |
 |---|---|
+| `http://<this-mac>:11471/` | The settings UI: status, translator and style, downloads, setup and health checks |
 | `mise run host:doctor` | Checks everything (tools, Claude login, LAN IP, services, model, disk) and prints the TV server URL |
 | `mise run services:install [server\|companion\|cleanup]` | (Re)installs and restarts the launchd agents (all by default) |
 | `mise run services:restart` / `services:logs` | Restart the agents / follow all logs |
@@ -73,8 +75,8 @@ Then point the TV at it and install the addon: [docs/runbooks/tv-setup.md](docs/
 | `mise run cleanup -- --dry-run` | Shows what the daily cleanup would delete |
 | `mise run server:configure` | Re-applies the server settings (cache, torrent profile, HTTPS for the LAN IP) |
 | `mise run tv -- pair\|status\|key HOME DOWN ENTER\|text '<s>'` | Controls the TV from the Mac (`TV_OS` = samsung · webos · androidtv · firetv; only Samsung is tested on a real TV): [TV runbook §6](docs/runbooks/tv-setup.md#6-tv-control-from-the-host) |
-| `mise run addon:url` | The addon URL to install in Stremio (`https://stremio.nomadware.io:8443/<secret>/manifest.json`; keep it private) |
-| `mise run tls:renew` | Get/renew the addon's Let's Encrypt certificate (a weekly agent does this automatically) |
+| `mise run addon:url` | The addon URL with an own domain (otherwise: the UI's Install page). Keep it private |
+| `mise run tls:renew` | Own domain only: get/renew its Let's Encrypt certificate (a weekly agent does this automatically) |
 | `mise tasks` | Everything else |
 
 ## Where things live
@@ -82,7 +84,8 @@ Then point the TV at it and install the addon: [docs/runbooks/tv-setup.md](docs/
 | What | Where |
 |---|---|
 | Committed config | `infra/env/*.env`, `infra/stremio-server/settings.json` |
-| This Mac's settings | `.env.local` (gitignored): `HOST_LAN_IP`, optional `CLAUDE_CLI` |
+| Your settings | `~/.config/stremio-plus-plus/config.toml` (+ `secrets.toml`: API key, addon token; mode 600) |
+| This Mac's wiring | `.env.local` (gitignored), all optional: `HOST_LAN_IP`, `CLAUDE_CLI`; the owner's `ADDON_DOMAIN`, `TV_HOST`, `TV_OS` |
 | Logs | `~/Library/Logs/stremio-plus-plus/{server,companion,cleanup}.log` |
 | Torrent cache | `~/Library/Application Support/stremio-plus-plus/stremio-server/stremio-cache/` |
 | Subtitles + play history | `~/Library/Application Support/stremio-plus-plus/companion/state.db` |

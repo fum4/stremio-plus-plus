@@ -57,3 +57,20 @@ def test_hourly_cap_forgets_calls_older_than_an_hour() -> None:
     now = [10_000.0]
     cap = HourlyCap(2, clock=lambda: now[0], calls=[now[0] - 4000, now[0] - 10])
     assert cap.used() == 1
+
+
+@pytest.mark.asyncio
+async def test_the_style_reaches_the_model() -> None:
+    seen: list[str] = []
+
+    class Recording(FakeBackend):
+        async def complete(
+            self, system: str, prompt: str, schema: dict[str, Any]
+        ) -> dict[str, Any] | None:
+            seen.append(system)
+            return await super().complete(system, prompt, schema)
+
+    backend = Recording({"cues": [{"id": 1, "ro": "Howdy."}]})
+    translator = LlmTranslator(backend, HourlyCap(9), 0, TranslatorStats(), system="COWBOY")
+    assert await translator.translate(["Hi."], []) == ["Howdy."]
+    assert seen == ["COWBOY"]

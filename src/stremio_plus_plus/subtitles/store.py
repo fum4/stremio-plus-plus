@@ -88,6 +88,13 @@ class SubtitleStore:
             for s, e, t in json.loads(payload)
         ]
 
+    def forget_spans(self, info_hash: str, file_index: int) -> None:
+        """Drop a file's generated subtitles (regenerate with new settings)."""
+        self._conn.execute(
+            "DELETE FROM subtitle_spans WHERE info_hash = ? AND file_index = ?",
+            (info_hash, file_index),
+        )
+
     def copy_spans(self, source: SubtitleFile, info_hash: str, file_index: int) -> None:
         self._conn.execute(
             """INSERT OR IGNORE INTO subtitle_spans

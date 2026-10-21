@@ -65,6 +65,7 @@ class _Job:
     queued_ahead: bool = False  # the next episode, not playing yet: fill from the start
     wanted: bool = False  # the viewer picked the track; until then only PRIME_S ahead
     url: str | None = None  # a direct (debrid) link; torrent files are read via the server
+    generation: int = 0  # bumped by regenerate(): a translation started before it is dropped
 
     def playhead_s(self) -> float:
         return self.playhead_fraction * (self.meta.duration_s if self.meta else 0.0)
@@ -142,6 +143,17 @@ class SubtitleJobs:
         job.last_active = 0.0  # after every file actually being watched
         log.info("subtitles_queued_next_episode", file=file_name)
         self._wake.set()
+
+    def regenerate(self, info_hash: str, file_index: int) -> None:
+        """Forget a file's subtitles (e.g. after a style or model change); they're generated again
+        on the next request, playhead first. Never served half old, half new beyond one window."""
+        self._store.forget_spans(info_hash, file_index)
+        job = self._jobs.get((info_hash, file_index))
+        if job is not None:
+            job.generation += 1
+            job.dead = False
+            job.failures.clear()
+            self._wake.set()
 
     def cues(self, info_hash: str, file_index: int) -> list[Cue]:
         return self._store.cues(info_hash, file_index)
@@ -306,13 +318,14 @@ class SubtitleJobs:
     async def _translate(self, job: _Job, window: Span, heard: _Heard) -> None:
         own = heard.cues
         t3 = self._clock()  # after the previous window's translation, if it was still running
+        generation = job.generation
         try:
             earlier = self._store.cues(job.info_hash, job.file_index)
             context = [c.text for c in earlier if c.start < window[0]]
             romanian = await self._guard(
                 job, window, self._translator.translate([c.text for c in own], context)
             )
-            if romanian is None:
+            if romanian is None or job.generation != generation:
                 return
             cues = [Cue(c.start, c.end, ro) for c, ro in zip(own, romanian, strict=True)]
             self._store.save_span(job.info_hash, job.file_index, window, cues)

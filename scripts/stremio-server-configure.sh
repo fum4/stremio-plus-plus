@@ -5,7 +5,9 @@
 # cert for <ip-dashed>.<id>.stremio.rocks — the TV app refuses plain http to non-localhost.
 set -euo pipefail
 : "${STREMIO_SERVER_URL:?run via mise}"
-: "${HOST_LAN_IP:?set HOST_LAN_IP=<LAN IP> in .env.local}"
+# HOST_LAN_IP from .env.local, else the address of the default route's interface (as config/host.py).
+HOST_LAN_IP="${HOST_LAN_IP:-$(ipconfig getifaddr "$(route -n get default | awk '/interface:/{print $2}')")}"
+: "${HOST_LAN_IP:?no LAN address: connect to the network or set HOST_LAN_IP in .env.local}"
 for _ in $(seq 1 30); do curl -sf -m2 "$STREMIO_SERVER_URL/settings" >/dev/null && break; sleep 1; done
 body="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["remoteHttps"]=sys.argv[2]; print(json.dumps(d))' \
   infra/stremio-server/settings.json "$HOST_LAN_IP")"

@@ -19,8 +19,11 @@ Everything the host needs is in this repo; per-machine state is four things: `.e
 4. **Fixed LAN IP:** router → DHCP reservation for the new Mac's Wi-Fi MAC (`ifconfig en0 | awk '/ether/{print $2}'`; with *Private Wi-Fi address* = **Fixed** that's the private MAC). Then create `.env.local`:
    ```
    HOST_LAN_IP=<the reserved IP>
+   ADDON_DOMAIN=stremio.nomadware.io
+   TV_HOST=192.168.1.134
+   TV_OS=samsung
    ```
-   (Only if Claude Code lives elsewhere: `CLAUDE_CLI=<path>`.)
+   The last three are the owner's personal setup (own addon domain, TV control); without them the host runs the zero-config path (the addon under the server's stremio.rocks certificate, a generated token), which would change the installed addon URL. (Only if Claude Code lives elsewhere: `CLAUDE_CLI=<path>`.)
 5. **Bring over the history (optional but recommended)** — demote the old Mac first (`mise run host:demote`), then copy
    `~/Library/Application Support/stremio-plus-plus/companion/state.db*` from old → same path on the new Mac. Generated subtitles come with it; the torrent cache doesn't need to (it re-downloads).
    Copy `~/.config/stremio-plus-plus/` too (keep `secrets.toml` at mode 600); without it the new host starts on the defaults.

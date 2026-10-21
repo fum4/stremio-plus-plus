@@ -14,6 +14,7 @@ let settings = {
       max_calls_per_hour: 120,
       timeout_s: 180,
       context_cues: 15,
+      style: "",
     },
     speech: {
       engine: "mlx-whisper",
@@ -31,6 +32,77 @@ const models = [
   { id: "claude-sonnet-5-5", label: "Claude Sonnet 5.5", note: "More natural phrasing, slower" },
   { id: "claude-opus-5-5", label: "Claude Opus 5.5", note: "Best quality, priciest" },
 ];
+
+// Setup flow: the server isn't set up for the TV and the model isn't downloaded, at first.
+const setupState = { serverReady: false, completed: false, modelStart: 0 };
+const MODEL_TOTAL = 1.62 * GB;
+
+function modelView() {
+  if (!setupState.modelStart) return { model: settings.subtitles.speech.model, state: "idle" };
+  const downloaded = Math.min(MODEL_TOTAL, ((Date.now() - setupState.modelStart) / 9000) * MODEL_TOTAL);
+  return {
+    model: settings.subtitles.speech.model,
+    state: downloaded >= MODEL_TOTAL ? "done" : "running",
+    total: MODEL_TOTAL,
+    downloaded,
+    error: null,
+  };
+}
+
+function setupView() {
+  const s = setupState;
+  const translatorReady =
+    settings.subtitles.translator.provider === "claude-cli" || secrets.anthropic_api_key;
+  const modelDone = modelView().state === "done";
+  return {
+    completed: s.completed,
+    lan_ip: "192.168.1.132",
+    checks: [
+      { id: "mac", label: "Apple Silicon Mac", level: "ok", detail: "Darwin arm64", fix: null },
+      { id: "tools", label: "Audio tools", level: "ok", detail: "ffmpeg and ffprobe found", fix: null },
+      { id: "server", label: "Streaming server", level: "ok", detail: "http://127.0.0.1:11470", fix: null },
+      { id: "disk", label: "Free disk space", level: "ok", detail: "212 GB free", fix: null },
+      {
+        id: "server_tv",
+        label: "Server reachable by the TV",
+        level: s.serverReady ? "ok" : "warn",
+        detail: s.serverReady ? "HTTPS for 192.168.1.132" : "not set up for the TV yet",
+        fix: s.serverReady ? null : "configure_server",
+      },
+      {
+        id: "https",
+        label: "Addon over HTTPS",
+        level: s.serverReady ? "ok" : "warn",
+        detail: s.serverReady
+          ? "192-168-1-132.519b6502d940.stremio.rocks (stremio)"
+          : "waiting for a certificate",
+        fix: s.serverReady ? null : "configure_server",
+      },
+      {
+        id: "translator",
+        label: "Translator",
+        level: translatorReady ? "ok" : "warn",
+        detail: translatorReady ? "ready" : "add an API key",
+        fix: translatorReady ? null : "subtitles",
+      },
+      {
+        id: "model",
+        label: "Speech model",
+        level: modelDone ? "ok" : "warn",
+        detail: modelDone ? settings.subtitles.speech.model : "not downloaded yet",
+        fix: modelDone ? null : "download_model",
+      },
+    ],
+    tv: {
+      server_url: s.serverReady ? "https://192-168-1-132.519b6502d940.stremio.rocks:12470" : null,
+      revert_url: "http://127.0.0.1:11470",
+    },
+    addon_url: s.serverReady
+      ? "https://192-168-1-132.519b6502d940.stremio.rocks:8443/0f3c9b1e7d2a4c58b6e1f09a/manifest.json"
+      : null,
+    model: modelView(),
+  };
+}
 
 const view = () => ({
   settings,
@@ -103,7 +175,10 @@ function status() {
     },
     disk: { free: 212 * GB, reserve: settings.downloads.min_free_gb * GB },
     addon: {
-      manifest_url: "https://stremio.example.com:8443/0f3c9b1e7d2a4c58b6e1f09a/manifest.json",
+      manifest_url: setupState.serverReady
+        ? "https://192-168-1-132.519b6502d940.stremio.rocks:8443/0f3c9b1e7d2a4c58b6e1f09a/manifest.json"
+        : null,
+      https: setupState.serverReady ? "stremio" : null,
     },
     settings_version: String(version),
   };
@@ -146,6 +221,22 @@ export function mockApi(): Plugin {
         const path = url.slice(4).split("?")[0];
         if (req.method === "GET" && path === "/settings") return send(res, view());
         if (req.method === "GET" && path === "/status") return send(res, status());
+        if (req.method === "GET" && path === "/setup") return send(res, setupView());
+        if (req.method === "POST" && path === "/setup/server") {
+          await new Promise((r) => setTimeout(r, 1200));
+          setupState.serverReady = true;
+          return send(res, setupView());
+        }
+        if (req.method === "POST" && path === "/setup/model") {
+          setupState.modelStart ||= Date.now();
+          return send(res, modelView());
+        }
+        if (req.method === "GET" && path === "/setup/model") return send(res, modelView());
+        if (req.method === "POST" && path === "/setup/complete") {
+          setupState.completed = true;
+          return send(res, setupView());
+        }
+        if (req.method === "POST" && path?.endsWith("/regenerate")) return send(res, { ok: true });
         if (req.method === "GET" && path === "/providers") {
           return send(res, [
             {

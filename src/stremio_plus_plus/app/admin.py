@@ -20,6 +20,8 @@ from stremio_plus_plus.downloads.disk import free_bytes
 from stremio_plus_plus.subtitles.translators.base import TranslatorConfigError
 from stremio_plus_plus.subtitles.translators.registry import PROVIDERS
 
+# Secrets the UI may set. addon_token is the companion's own (host.py): it changes only by hand.
+UI_SECRETS = ("anthropic_api_key",)
 SAMPLE = [
     "Where the hell have you been?",
     "I told you, I was at my sister's.",
@@ -32,16 +34,16 @@ def _services(request: Request) -> Services:
     return request.app.state.services
 
 
-def _require_ui(request: Request, x_stremio_plus_plus: str | None = Header(default=None)) -> None:
+def require_ui(request: Request, x_stremio_plus_plus: str | None = Header(default=None)) -> None:
     if x_stremio_plus_plus != "1":
         raise HTTPException(status_code=403, detail="missing X-Stremio-Plus-Plus header")
-    env = _services(request).env
+    lan_ip = str(_services(request).host.lan_ip)
     host = (request.headers.get("host") or "").rsplit(":", 1)[0]
-    if host not in {str(env.host_lan_ip), "localhost", "127.0.0.1"} and not host.endswith(".local"):
+    if host not in {lan_ip, "localhost", "127.0.0.1"} and not host.endswith(".local"):
         raise HTTPException(status_code=403, detail=f"open the UI via the LAN address, not {host}")
 
 
-router = APIRouter(prefix="/api", dependencies=[Depends(_require_ui)])
+router = APIRouter(prefix="/api", dependencies=[Depends(require_ui)])
 
 
 def _settings_view(services: Services) -> dict[str, Any]:
@@ -51,7 +53,7 @@ def _settings_view(services: Services) -> dict[str, Any]:
         "version": f.version,
         "path": str(f.path),
         "error": f.error,
-        "secrets": {name: value is not None for name, value in f.secrets.model_dump().items()},
+        "secrets": {name: getattr(f.secrets, name) is not None for name in UI_SECRETS},
     }
 
 
@@ -77,6 +79,8 @@ class SecretBody(BaseModel):
 @router.put("/secrets/{name}")
 async def put_secret(request: Request, name: str, body: SecretBody) -> dict[str, Any]:
     services = _services(request)
+    if name not in UI_SECRETS:
+        raise HTTPException(status_code=404, detail=f"unknown secret {name!r}")
     try:
         services.settings_file.set_secret(name, (body.value or "").strip() or None)
     except SettingsError as exc:
@@ -86,7 +90,10 @@ async def put_secret(request: Request, name: str, body: SecretBody) -> dict[str,
 
 @router.get("/providers")
 async def providers(request: Request) -> list[dict[str, Any]]:
-    services = _services(request)
+    return provider_status(_services(request))
+
+
+def provider_status(services: Services) -> list[dict[str, Any]]:
     secrets = services.settings_file.secrets.model_dump()
     out: list[dict[str, Any]] = []
     for info in PROVIDERS.values():
@@ -122,6 +129,13 @@ async def test_translator(request: Request, body: dict[str, Any]) -> dict[str, A
         "seconds": round(time.monotonic() - t0, 2),
         "lines": [{"source": s, "target": t} for s, t in zip(SAMPLE, out, strict=True)],
     }
+
+
+@router.post("/subtitles/{info_hash}/{file_index}/regenerate")
+async def regenerate(request: Request, info_hash: str, file_index: int) -> dict[str, bool]:
+    """Forget a file's subtitles so they're generated again with the current settings."""
+    _services(request).subtitles.regenerate(info_hash.lower(), file_index)
+    return {"ok": True}
 
 
 @router.get("/status")
@@ -165,9 +179,8 @@ async def status(request: Request) -> dict[str, Any]:
             "reserve": settings.downloads.min_free_bytes,
         },
         "addon": {
-            "manifest_url": (
-                f"https://{env.addon_domain}:{env.addon_https_port}/{env.addon_token}/manifest.json"
-            ),
+            "manifest_url": services.host.manifest_url,
+            "https": services.host.tls.mode if services.host.tls else None,
         },
         "settings_version": services.settings_file.version,
     }

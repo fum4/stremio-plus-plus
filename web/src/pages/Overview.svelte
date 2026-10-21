@@ -4,7 +4,9 @@
     Captions,
     HardDrive,
     Languages,
+    ListChecks,
     Pin,
+    RotateCcw,
     Server,
     Sparkles,
     Users,
@@ -19,12 +21,20 @@
   import StatCard from "../lib/components/StatCard.svelte";
   import { ago, bytes, clock, prettyName, speed } from "../lib/format";
   import { app } from "../lib/state.svelte";
+  import { api } from "../lib/api";
 
   const s = $derived(app.status);
   const coveredS = (spans: [number, number][]) => spans.reduce((n, [a, b]) => n + b - a, 0);
   const isDone = (j: { duration_s: number | null; covered: [number, number][] }) =>
     j.duration_s !== null && coveredS(j.covered) >= j.duration_s - 1;
   const generating = $derived(s?.subtitles.filter((j) => !j.failed && !isDone(j)) ?? []);
+  async function regenerate(infoHash: string, fileIndex: number, name: string) {
+    if (!confirm(`Generate the subtitles for “${prettyName(name)}” again with the current settings?`)) return;
+    await api.regenerate(infoHash, fileIndex);
+    app.toast("success", "Regenerating", "New subtitles arrive as the film plays, playhead first");
+    await app.poll();
+  }
+
   const greeting = (() => {
     const h = new Date().getHours();
     return h < 5 ? "Late show" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
@@ -32,6 +42,14 @@
 </script>
 
 <PageHeader title={greeting} subtitle="What your stremio++ host is doing right now." />
+
+{#if app.setup && !app.setup.completed}
+  <a class="setup-nudge" href="#setup" in:fly={{ y: -8, duration: 300 }}>
+    <ListChecks size={16} />
+    <span>Setup isn't finished yet: the TV may not be able to use this Mac.</span>
+    <strong>Continue setup →</strong>
+  </a>
+{/if}
 
 {#if s}
   <div class="stats">
@@ -98,6 +116,13 @@
           <li animate:flip={{ duration: 400 }} in:fly={{ y: 10, duration: 400 }}>
             <div class="row">
               <span class="name" title={job.file_name}>{prettyName(job.file_name)}</span>
+              <button
+                class="regen"
+                title="Forget these subtitles and generate them again with the current settings"
+                onclick={() => regenerate(job.info_hash, job.file_index, job.file_name)}
+              >
+                <RotateCcw size={13} /> Regenerate
+              </button>
               {#if job.failed}
                 <Badge tone="bad">Failed: retries when you reselect the track</Badge>
               {:else if isDone(job)}
@@ -215,8 +240,55 @@
   .row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 12px;
+  }
+
+  .row .name {
+    flex: 1;
+  }
+
+  .regen {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    font-size: 12px;
+    color: var(--text-faint);
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    opacity: 0;
+    transition:
+      opacity 0.2s,
+      color 0.2s,
+      border-color 0.2s;
+  }
+
+  li:hover .regen,
+  .regen:focus-visible {
+    opacity: 1;
+  }
+
+  .regen:hover {
+    color: var(--text);
+    border-color: var(--border-strong);
+  }
+
+  .setup-nudge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    color: var(--amber);
+    background: rgba(251, 191, 119, 0.07);
+    border: 1px solid rgba(251, 191, 119, 0.22);
+    font-size: 13px;
+  }
+
+  .setup-nudge span {
+    flex: 1;
+    color: var(--text);
   }
 
   .name {

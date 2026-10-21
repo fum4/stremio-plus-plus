@@ -21,7 +21,7 @@ from stremio_plus_plus.subtitles.cues import Cue, render_srt
 
 
 def require_token(request: Request, token: str) -> None:
-    if not secrets.compare_digest(token, services_of(request).env.addon_token):
+    if not secrets.compare_digest(token, services_of(request).host.addon_token):
         raise HTTPException(status_code=404)
 
 
@@ -78,7 +78,7 @@ async def subtitles(request: Request, kind: str, item_id: str, extra: str) -> di
 
 
 def _entry(services: Services, info_hash: str, file_index: int) -> dict[str, str]:
-    base = f"http://{services.env.host_lan_ip}:{services.env.companion_port}"
+    base = f"http://{services.host.lan_ip}:{services.env.companion_port}"
     return {
         "id": f"companion-ro-{info_hash[:8]}-{file_index}",
         "lang": LANG,

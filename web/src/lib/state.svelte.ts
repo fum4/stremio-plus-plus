@@ -1,5 +1,5 @@
 import { api, ApiError } from "./api";
-import type { Provider, Settings, SettingsView, Status } from "./types";
+import type { Provider, Settings, SettingsView, SetupState, Status } from "./types";
 
 const STATUS_POLL_MS = 2000;
 
@@ -33,6 +33,7 @@ class AppState {
   draft = $state<Settings | null>(null);
   status = $state<Status | null>(null);
   providers = $state<Provider[]>([]);
+  setup = $state<SetupState | null>(null);
   toasts = $state<Toast[]>([]);
   saving = $state(false);
   online = $state(true);
@@ -42,8 +43,13 @@ class AppState {
   #nextToast = 1;
 
   async start(): Promise<void> {
-    await Promise.all([this.loadSettings(), this.loadProviders(), this.poll()]);
+    await Promise.all([this.loadSettings(), this.loadProviders(), this.poll(), this.loadSetup()]);
     setInterval(() => void this.poll(), STATUS_POLL_MS);
+  }
+
+  async loadSetup(): Promise<SetupState> {
+    this.setup = await api.setup();
+    return this.setup;
   }
 
   async loadSettings(): Promise<void> {
