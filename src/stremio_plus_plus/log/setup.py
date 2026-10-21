@@ -6,6 +6,7 @@ import structlog
 
 from stremio_plus_plus.config.env import LogFormat, LogLevel
 from stremio_plus_plus.log.constants import QUIET_LOGGERS
+from stremio_plus_plus.log.hub import HUB
 
 
 def configure_logging(level: LogLevel, fmt: LogFormat) -> None:
@@ -16,6 +17,7 @@ def configure_logging(level: LogLevel, fmt: LogFormat) -> None:
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
+        HUB.capture,  # the UI's log view (log/hub.py); passes events through unchanged
     ]
     # Exceptions become a structured "exception" field in JSON (pretty tracebacks on the console).
     exceptions: list[structlog.types.Processor] = (

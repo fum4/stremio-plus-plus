@@ -78,7 +78,8 @@ class DownloadManager:
                 log.warning("pin_progress_timeout", info_hash=info_hash, file_index=file_index)
                 continue
             if progress is None or progress >= COMPLETE_PROGRESS:
-                await self._pinner.release(info_hash, file_index)
+                reason = "torrent closed" if progress is None else "complete"
+                await self._pinner.release(info_hash, file_index, reason)
 
     async def run_sweeper(self, interval_s: float = PIN_SWEEP_INTERVAL_S) -> None:
         while True:

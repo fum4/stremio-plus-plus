@@ -15,6 +15,7 @@ from stremio_plus_plus.config.settings_file import SettingsFile
 from stremio_plus_plus.downloads.manager import DownloadManager
 from stremio_plus_plus.downloads.pins import Pinner
 from stremio_plus_plus.server.client import StremioServer
+from stremio_plus_plus.state.activity import ActivityStore
 from stremio_plus_plus.state.plays import Plays
 from stremio_plus_plus.stream.sessions import Sessions
 from stremio_plus_plus.subtitles.jobs import SubtitleJobs
@@ -68,4 +69,5 @@ class Services:
     translator: ConfiguredTranslator
     model_download: ModelDownload
     clients: ClientMonitor
+    activity: ActivityStore
     tv: TvService

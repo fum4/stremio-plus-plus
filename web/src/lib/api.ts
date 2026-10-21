@@ -10,6 +10,8 @@ import type {
   FoundTv,
   TvOs,
   TvState,
+  ActivityItem,
+  LogEntry,
 } from "./types";
 
 export class ApiError extends Error {}
@@ -46,6 +48,10 @@ export const api = {
   setupModel: () => call<ModelDownload>("POST", "/setup/model"),
   modelProgress: () => call<ModelDownload>("GET", "/setup/model"),
   completeSetup: () => call<SetupState>("POST", "/setup/complete"),
+  logs: (after: number) => call<{ entries: LogEntry[]; cursor: number }>("GET", `/logs?after=${after}`),
+  activity: (since: number) => call<{ items: ActivityItem[] }>("GET", `/activity?since=${since}`),
+  activityBefore: (id: number) =>
+    call<{ items: ActivityItem[] }>("GET", `/activity?before=${id}&limit=100`),
   tv: () => call<TvState>("GET", "/tv"),
   discoverTvs: () => call<FoundTv[]>("POST", "/tv/discover"),
   chooseTv: (host: string, os: TvOs) => call<TvState>("PUT", "/tv", { host, os }),

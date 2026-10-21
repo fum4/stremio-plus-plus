@@ -57,6 +57,19 @@ Goal: a stranger with an Apple Silicon Mac goes from `git clone` to subtitles wi
 ## Translation style
 `subtitles.translator.style` (free text, ≤ 2000 chars, presets in the UI): it **replaces** the tone guidance of the system prompt (next to "as a professional subtitler would" the model plays it safe) while the id/format rules stay. Verified on Haiku 5.5: "cowboy" → *Unde dracu' ai fost, partenere? / Ne cărăm. Acum.* Applies to newly generated windows; **Regenerate** (Overview, `POST /api/subtitles/{hash}/{file}/regenerate`) forgets a film's subtitles so they're redone playhead-first, dropping any translation started before the click.
 
+## Activity and logs (built)
+The UI's **Activity** page has two tabs:
+- **Activity:** a readable timeline (`app/activity.py`, rules in `app/activity_rules.py`, history in SQLite `activity`, migration 4).
+  - Fed by the server-log tracker (TV connected, playing, seeks, torrents) and by every companion event.
+  - Titles and posters come from the TV's addon requests, looked up on Cinemeta.
+  - Repeats coalesce ("Romanian subtitles: 14 parts").
+  - On first start it backfills from `companion.log`.
+- **Raw logs:** server.js and companion lines, live (`log/hub.py`, an in-memory ring fed by the tail and a structlog processor, seeded from both files).
+  - Filters: source, level, noise, search.
+  - Untagged server requests are labelled **TV**.
+
+What we can and can't see is in the PR. In short: no client IPs or timestamps in server.log, nothing from inside the TV app. Secrets are redacted on the way in (the authKey server.js prints, the addon token, API keys).
+
 ## Next
 1. **Profiles + languages (decision 2):** `languages = [...]` per install URL, `behaviorHints.configurable` + `/configure` page; STT once per file, translation per language (store keyed by language, append-only migration); one prompt template per language.
 2. **`openai-compatible` backend** (covers local models), then benchmark candidates on Batman.

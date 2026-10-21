@@ -8,6 +8,7 @@ from stremio_plus_plus.config.env import load_env
 REQUIRED = {
     "STREMIO_SERVER_URL": "http://127.0.0.1:11470",
     "STREMIO_SERVER_LOG": "~/Library/Logs/stremio-plus-plus/server.log",
+    "COMPANION_LOG": "~/Library/Logs/stremio-plus-plus/companion.log",
     "STREMIO_SERVER_DATA_DIR": "~/Library/Application Support/stremio-plus-plus/stremio-server",
     "STREMIO_SERVER_SETTINGS": "infra/stremio-server/settings.json",
     "COMPANION_HOST": "0.0.0.0",
