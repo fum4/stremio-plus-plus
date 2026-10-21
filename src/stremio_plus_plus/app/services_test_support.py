@@ -9,6 +9,7 @@ from pydantic import AnyHttpUrl
 
 from stremio_plus_plus.app.picker import Picker
 from stremio_plus_plus.app.services import HostInfo, Services
+from stremio_plus_plus.app.tv_service import TvService
 from stremio_plus_plus.config.env import Env
 from stremio_plus_plus.config.settings_file import SettingsFile
 from stremio_plus_plus.downloads.manager import DownloadManager
@@ -23,6 +24,7 @@ from stremio_plus_plus.subtitles.model_cache import ModelDownload
 from stremio_plus_plus.subtitles.store import SubtitleStore
 from stremio_plus_plus.subtitles.translators.registry import ConfiguredTranslator
 from stremio_plus_plus.tls.addon import AddonTls
+from stremio_plus_plus.watch.clients import ClientMonitor
 
 TOKEN = "k" * 32
 DOMAIN = "192-168-1-132.519b6502d940.stremio.rocks"
@@ -46,8 +48,8 @@ def make_services(tmp_path: Path, handler: Callable[[httpx.Request], httpx.Respo
         config_dir=tmp_path / "config",
         ui_dir=tmp_path / "ui",
         host_lan_ip=IPv4Address("192.168.1.132"),
-        tv_host=IPv4Address("192.168.1.134"),
-        tv_os="samsung",
+        tv_host=None,  # a fresh install: the TV comes from config.toml via the setup
+        tv_os=None,
         addon_domain="stremio.nomadware.io",
         addon_https_port=8443,
         addon_token=TOKEN,
@@ -80,4 +82,6 @@ def make_services(tmp_path: Path, handler: Callable[[httpx.Request], httpx.Respo
         sessions=Sessions(tmp_path / "hls"),
         playback_handlers=[],
         model_download=ModelDownload(),
+        clients=ClientMonitor(tmp_path),
+        tv=TvService(env, settings_file),
     )

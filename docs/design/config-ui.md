@@ -61,5 +61,5 @@ Goal: a stranger with an Apple Silicon Mac goes from `git clone` to subtitles wi
 1. **Profiles + languages (decision 2):** `languages = [...]` per install URL, `behaviorHints.configurable` + `/configure` page; STT once per file, translation per language (store keyed by language, append-only migration); one prompt template per language.
 2. **`openai-compatible` backend** (covers local models), then benchmark candidates on Batman.
 3. **Server tuning in the file:** cache size (never 0) and the torrent profile from `infra/stremio-server/settings.json` move into `config.toml`, applied through `POST /settings`.
-4. **TV from the wizard:** type the server URL on the TV through `tv/` (needs the companion to own TV pairing), and detect "TV online" from the server log instead of a tick.
+4. **TV from the wizard: built** (discovery, pairing in the UI, Type it for me, connection detected from the server log). Left: record `SET_SERVER_URL` on the Samsung (launch Stremio by app id, keys to the field) with the owner at the TV, then other TV OSes as people contribute them.
 5. **Admin password** for the UI once hosts are shared beyond one household.

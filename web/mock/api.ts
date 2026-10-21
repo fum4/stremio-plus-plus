@@ -33,6 +33,34 @@ const models = [
   { id: "claude-opus-5-5", label: "Claude Opus 5.5", note: "Best quality, priciest" },
 ];
 
+// TV control: nothing chosen at first; pairing asks for Allow, typing "connects" the TV.
+const tvState = {
+  target: null as null | { host: string; os: string },
+  pairedAt: 0,
+  pairStart: 0,
+  connectedAt: 0,
+};
+const FOUND = [
+  { host: "192.168.1.134", name: "[TV] Samsung 7 Series (43)", model: "UE43TU7092UXXH", manufacturer: "Samsung Electronics", os: "samsung" },
+  { host: "192.168.1.135", name: "Living Room", model: "Eureka Dongle", manufacturer: "Google", os: null },
+];
+
+function tvView() {
+  const now = Date.now();
+  const paired = tvState.pairedAt > 0 && now >= tvState.pairedAt;
+  return {
+    target: tvState.target,
+    pinned_by_env: false,
+    paired,
+    pairing: {
+      state: paired ? "paired" : tvState.pairStart ? "waiting" : "idle",
+      error: null,
+    },
+    can_drive: false,
+    client_last_seen: tvState.connectedAt && now >= tvState.connectedAt ? tvState.connectedAt / 1000 : null,
+  };
+}
+
 // Setup flow: the server isn't set up for the TV and the model isn't downloaded, at first.
 const setupState = { serverReady: false, completed: false, modelStart: 0 };
 const MODEL_TOTAL = 1.62 * GB;
@@ -84,6 +112,13 @@ function setupView() {
         level: translatorReady ? "ok" : "warn",
         detail: translatorReady ? "ready" : "add an API key",
         fix: translatorReady ? null : "subtitles",
+      },
+      {
+        id: "tv_connected",
+        label: "TV connected",
+        level: tvView().client_last_seen ? "ok" : "warn",
+        detail: tvView().client_last_seen ? "a Stremio app is using this server" : "waiting for the TV",
+        fix: null,
       },
       {
         id: "model",
@@ -237,6 +272,29 @@ export function mockApi(): Plugin {
           return send(res, setupView());
         }
         if (req.method === "POST" && path?.endsWith("/regenerate")) return send(res, { ok: true });
+        if (req.method === "GET" && path === "/tv") return send(res, tvView());
+        if (req.method === "POST" && path === "/tv/discover") {
+          await new Promise((r) => setTimeout(r, 2500));
+          return send(res, FOUND);
+        }
+        if (req.method === "PUT" && path === "/tv") {
+          const { host, os } = (await body(req)) as { host: string; os: string };
+          tvState.target = { host, os };
+          return send(res, tvView());
+        }
+        if (req.method === "POST" && path === "/tv/pair") {
+          tvState.pairStart = Date.now();
+          tvState.pairedAt = Date.now() + 4000;
+          return send(res, tvView());
+        }
+        if (req.method === "POST" && path === "/tv/type") {
+          const { which } = (await body(req)) as { which: string };
+          if (which === "server") tvState.connectedAt = Date.now() + 3000;
+          return send(res, { ok: true });
+        }
+        if (req.method === "POST" && path === "/tv/apply") {
+          return send(res, { detail: "no recorded key sequence for this TV yet: use Type it for me" }, 502);
+        }
         if (req.method === "GET" && path === "/providers") {
           return send(res, [
             {

@@ -5,12 +5,14 @@ has a default, so a missing file or section means "the defaults", and an unknown
 (a typo must not silently do nothing).
 """
 
+from ipaddress import IPv4Address
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 TranslatorProvider = Literal["claude-cli", "anthropic"]
 SpeechEngine = Literal["mlx-whisper"]
+TvOs = Literal["samsung", "webos", "androidtv", "firetv"]
 
 
 class _Section(BaseModel):
@@ -51,9 +53,17 @@ class DownloadSettings(_Section):
         return self.stale_after_days * 86400
 
 
+class TvSettings(_Section):
+    """A TV this host can control (tv/): found and paired by the setup, or written by hand."""
+
+    host: IPv4Address | None = None
+    os: TvOs | None = None  # which tv/ adapter; only samsung is verified on hardware
+
+
 class Settings(_Section):
     subtitles: SubtitleSettings = SubtitleSettings()
     downloads: DownloadSettings = DownloadSettings()
+    tv: TvSettings = TvSettings()
 
 
 class Secrets(_Section):

@@ -9,6 +9,7 @@ import socket
 from ipaddress import IPv4Address
 
 from stremio_plus_plus.config.env import Env
+from stremio_plus_plus.config.settings import Settings, TvOs
 from stremio_plus_plus.config.settings_file import SettingsFile
 
 TOKEN_BYTES = 24  # 32 url-safe characters
@@ -45,3 +46,12 @@ def addon_token(env: Env, settings_file: SettingsFile) -> str:
     token = secrets.token_urlsafe(TOKEN_BYTES)
     settings_file.set_secret("addon_token", token)
     return token
+
+
+def tv_target(env: Env, settings: Settings) -> tuple[IPv4Address, TvOs] | None:
+    """The TV to control: TV_HOST + TV_OS from the environment win, else config.toml [tv]."""
+    if env.tv_host and env.tv_os:
+        return env.tv_host, env.tv_os
+    if settings.tv.host and settings.tv.os:
+        return settings.tv.host, settings.tv.os
+    return None

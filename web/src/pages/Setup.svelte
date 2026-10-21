@@ -124,7 +124,7 @@
           <AddonInstall url={setup.addon_url} />
         {/if}
 
-        {#if step.checks.length && (step.id !== "model" || done.has("model"))}
+        {#if step.checks.length && step.id !== "tv" && (step.id !== "model" || done.has("model"))}
           <div class="checks" class:block={step.id !== "machine"}>
             {#each stepChecks(setup, step) as check, i (check.id)}
               <div in:fly={{ y: 8, duration: 350, delay: i * 60 }}><CheckRow {check} /></div>
@@ -132,7 +132,7 @@
           </div>
         {/if}
 
-        {#if step.confirm}
+        {#if step.confirm && (!done.has(step.id) || ticked.has(step.id))}
           <label class="confirm block">
             <input
               type="checkbox"
@@ -148,7 +148,7 @@
             <ArrowLeft size={15} /> Back
           </button>
           <div class="right">
-            {#if step.checks.length}
+            {#if step.checks.length && step.id !== "tv"}
               <button class="btn ghost" onclick={recheck} disabled={refreshing}>
                 <RefreshCw size={14} class={refreshing ? "spin" : ""} /> Check again
               </button>

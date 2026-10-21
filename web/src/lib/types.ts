@@ -96,7 +96,16 @@ export interface TranslatorTest {
 export type CheckLevel = "ok" | "warn" | "bad";
 
 export interface SetupCheck {
-  id: "mac" | "tools" | "server" | "server_tv" | "https" | "translator" | "model" | "disk";
+  id:
+    | "mac"
+    | "tools"
+    | "server"
+    | "server_tv"
+    | "https"
+    | "translator"
+    | "model"
+    | "tv_connected"
+    | "disk";
   label: string;
   level: CheckLevel;
   detail: string;
@@ -119,4 +128,23 @@ export interface SetupState {
   tv: { server_url: string | null; revert_url: string };
   addon_url: string | null;
   model: ModelDownload;
+}
+
+export type TvOs = "samsung" | "webos" | "androidtv" | "firetv";
+
+export interface FoundTv {
+  host: string;
+  name: string;
+  model: string;
+  manufacturer: string;
+  os: TvOs | null;
+}
+
+export interface TvState {
+  target: { host: string; os: TvOs } | null;
+  pinned_by_env: boolean;
+  paired: boolean;
+  pairing: { state: "idle" | "waiting" | "code" | "paired" | "failed"; error: string | null };
+  can_drive: boolean;
+  client_last_seen: number | null;
 }

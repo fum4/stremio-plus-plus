@@ -7,6 +7,9 @@ import type {
   TranslatorTest,
   ModelDownload,
   SetupState,
+  FoundTv,
+  TvOs,
+  TvState,
 } from "./types";
 
 export class ApiError extends Error {}
@@ -43,4 +46,11 @@ export const api = {
   setupModel: () => call<ModelDownload>("POST", "/setup/model"),
   modelProgress: () => call<ModelDownload>("GET", "/setup/model"),
   completeSetup: () => call<SetupState>("POST", "/setup/complete"),
+  tv: () => call<TvState>("GET", "/tv"),
+  discoverTvs: () => call<FoundTv[]>("POST", "/tv/discover"),
+  chooseTv: (host: string, os: TvOs) => call<TvState>("PUT", "/tv", { host, os }),
+  pairTv: () => call<TvState>("POST", "/tv/pair"),
+  tvCode: (code: string) => call<TvState>("POST", "/tv/pair/code", { code }),
+  typeOnTv: (which: "server" | "revert") => call<{ ok: boolean }>("POST", "/tv/type", { which }),
+  applyOnTv: (which: "server" | "revert") => call<{ ok: boolean }>("POST", "/tv/apply", { which }),
 };

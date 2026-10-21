@@ -30,9 +30,8 @@ def test_parses_playback_lines(line: str, expected: object) -> None:
     "line",
     [
         f"-> GET /{IH}/2?src=companion bytes=0-99",  # our own reads
-        f"-> GET /{IH}/2/stats.json ",
-        "-> GET /stats.json ",
-        f"-> GET /opensubHash?videoUrl=https%3A%2F%2Fx%2F{IH}%2F2%3F",
+        f"-> GET /{IH}/2/stats.json?src=companion",
+        "-> GET /stats.json?src=companion",
         f"Engine {IH} is inactive, destroying it",
         "SSDP error: {",
         "",

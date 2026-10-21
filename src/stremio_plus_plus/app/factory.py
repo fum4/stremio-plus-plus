@@ -10,13 +10,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from stremio_plus_plus.app import admin, setup
+from stremio_plus_plus.app import admin, setup, tv_api
 from stremio_plus_plus.app.addon import addon_router, lan_router
 from stremio_plus_plus.app.https_guard import HttpsGuard
 from stremio_plus_plus.app.picker import Picker
 from stremio_plus_plus.app.services import HostInfo, Services
 from stremio_plus_plus.app.stream_routes import router as stream_router
 from stremio_plus_plus.app.subtitle_switch import SubtitleSwitch
+from stremio_plus_plus.app.tv_service import TvService
 from stremio_plus_plus.config.env import Env
 from stremio_plus_plus.config.settings_file import SettingsFile
 from stremio_plus_plus.downloads.disk import free_bytes
@@ -31,6 +32,7 @@ from stremio_plus_plus.subtitles.model_cache import ModelDownload
 from stremio_plus_plus.subtitles.store import SubtitleStore
 from stremio_plus_plus.subtitles.stt import WhisperMlx
 from stremio_plus_plus.subtitles.translators.registry import ConfiguredTranslator
+from stremio_plus_plus.watch.clients import ClientMonitor
 from stremio_plus_plus.watch.log_tail import follow
 from stremio_plus_plus.watch.play_recorder import PlayRecorder
 from stremio_plus_plus.watch.tracker import run_tracker
@@ -64,6 +66,7 @@ def create_app(env: Env, settings_file: SettingsFile, host: HostInfo) -> FastAPI
             plays = Plays(db)
             subtitle_store = SubtitleStore(db)
             translator = ConfiguredTranslator(settings_file, env.claude_cli)
+            clients = ClientMonitor(env.companion_data_dir)
             whisper = WhisperMlx(lambda: settings_file.settings.subtitles.speech)
             subtitles = SubtitleJobs(server, subtitle_store, whisper, translator)
             downloads = DownloadManager(
@@ -93,12 +96,15 @@ def create_app(env: Env, settings_file: SettingsFile, host: HostInfo) -> FastAPI
                 playback_handlers=handlers,
                 translator=translator,
                 model_download=ModelDownload(),
+                clients=clients,
+                tv=TvService(env, settings_file),
             )
             app.state.services = services
             workers = [
                 asyncio.create_task(
                     run_tracker(
-                        follow(env.stremio_server_log), [*handlers, SubtitleSwitch(services)]
+                        follow(env.stremio_server_log),
+                        [*handlers, SubtitleSwitch(services), clients],
                     ),
                     name="tracker",
                 ),
@@ -135,6 +141,7 @@ def create_app(env: Env, settings_file: SettingsFile, host: HostInfo) -> FastAPI
     app.include_router(lan_router)
     app.include_router(admin.router)
     app.include_router(setup.router)
+    app.include_router(tv_api.router)
     app.add_middleware(HttpsGuard, https_port=env.addon_https_port, token=host.addon_token)
 
     @app.get("/health")
