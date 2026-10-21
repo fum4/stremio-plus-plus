@@ -64,12 +64,14 @@ echo "TV"
 tv_os="${TV_OS:-samsung}"
 case "$tv_os" in
   samsung) tv_port=8002 tv_pair="press Allow on the TV" ;;
-  webos) tv_port=3000 tv_pair="accept the prompt on the TV" ;;
+  webos) tv_port="3000 3001" tv_pair="accept the prompt on the TV" ;;  # ws, or wss only on newer firmware
   androidtv) tv_port=6466 tv_pair="type the code the TV shows" ;;
   firetv) tv_port=5555 tv_pair="Developer options → ADB debugging ON first, then Always allow + OK" ;;
   *) tv_port=0 tv_pair="" ; bad "TV_OS=$tv_os is not samsung|webos|androidtv|firetv" "fix TV_OS in infra/env/companion.env" ;;
 esac
-if nc -z -G 3 "$TV_HOST" "$tv_port" 2>/dev/null; then ok "TV reachable ($tv_os at $TV_HOST:$tv_port)"; else warn "TV not reachable at $TV_HOST:$tv_port ($tv_os)" "TV off/asleep, its IP changed (TV_HOST), or TV_OS is wrong (infra/env/companion.env)"; fi
+tv_up=""
+for p in $tv_port; do nc -z -G 3 "$TV_HOST" "$p" 2>/dev/null && { tv_up=$p; break; }; done
+if [ -n "$tv_up" ]; then ok "TV reachable ($tv_os at $TV_HOST:$tv_up)"; else warn "TV not reachable at $TV_HOST:$tv_port ($tv_os)" "TV off/asleep, its IP changed (TV_HOST), or TV_OS is wrong (infra/env/companion.env)"; fi
 python -m stremio_plus_plus.tv.cli status >/dev/null 2>&1 && ok "this host is paired with the TV" || bad "not paired with the TV" "mise run tv -- pair ($tv_pair)"
 
 echo "Data"

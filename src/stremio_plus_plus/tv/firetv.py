@@ -31,7 +31,7 @@ from stremio_plus_plus.tv.constants import (
     KEY_DELAY_S,
     PAIR_TIMEOUT_S,
 )
-from stremio_plus_plus.tv.credentials import remove, restrict
+from stremio_plus_plus.tv.credentials import private_umask, remove, restrict
 from stremio_plus_plus.tv.keys import ANDROID, native_keys
 
 _NATIVE_KEY = re.compile(r"^(KEYCODE_[A-Z0-9_]+|[0-9]{1,3})$")
@@ -85,7 +85,8 @@ class FireTvRemote:
         new_key = not self.paired
         if new_key:
             self._key_path.parent.mkdir(parents=True, exist_ok=True)
-            keygen(str(self._key_path))
+            with private_umask():
+                keygen(str(self._key_path))
             restrict(self._key_path, self._pub_path)
         try:
             async with self._session(PAIR_TIMEOUT_S):

@@ -15,8 +15,11 @@ class FakeClient:
         self.good_code = "A1B2C3"
 
     async def async_generate_cert_if_missing(self) -> bool:
-        Path(self.args[1]).write_text("CERT")
-        Path(self.args[2]).write_text("KEY")
+        cert, key = Path(self.args[1]), Path(self.args[2])
+        if cert.is_file() and key.is_file():  # like the library: reuse an existing pair
+            return False
+        cert.write_text("CERT")
+        key.write_text("KEY")
         return True
 
     async def async_start_pairing(self) -> None:
@@ -109,3 +112,14 @@ async def test_keys_and_text(setup: tuple[AndroidTvRemote, list[FakeClient]]) ->
     assert ("text", "http://x") in clients[-1].calls
     with pytest.raises(TvControlError, match="unknown"):
         await remote.keys("KEYCODE_NOPE")
+
+
+@pytest.mark.asyncio
+async def test_a_failed_re_pair_keeps_the_pairing_the_tv_already_accepted(
+    setup: tuple[AndroidTvRemote, list[FakeClient]], tmp_path: Path
+) -> None:
+    remote, _ = setup
+    await remote.pair(_code("a1b2c3"))
+    with pytest.raises(TvRefusedError):
+        await remote.pair(_code("ZZZZZZ"))  # mistyped code on a re-pair
+    assert remote.paired

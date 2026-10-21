@@ -1,6 +1,8 @@
 """Per-OS pairing credentials on disk: created mode 600, never readable by other users."""
 
 import os
+from collections.abc import Generator
+from contextlib import contextmanager
 from pathlib import Path
 
 
@@ -10,6 +12,16 @@ def write_secret(path: Path, content: str) -> None:
     with os.fdopen(fd, "w") as out:
         out.write(content)
     path.chmod(0o600)  # O_CREAT's mode does not apply to an existing file
+
+
+@contextmanager
+def private_umask() -> Generator[None]:
+    """Files a library creates in here are 600 from the start, not readable until restrict()."""
+    previous = os.umask(0o077)
+    try:
+        yield
+    finally:
+        os.umask(previous)
 
 
 def restrict(*paths: Path) -> None:

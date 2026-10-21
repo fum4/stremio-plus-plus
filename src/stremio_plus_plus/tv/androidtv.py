@@ -20,7 +20,7 @@ from androidtvremote2 import AndroidTVRemote, CannotConnect, ConnectionClosed, I
 
 from stremio_plus_plus.tv.base import CodePrompt, TvControlError, TvRefusedError
 from stremio_plus_plus.tv.constants import CLIENT_NAME, KEY_DELAY_S
-from stremio_plus_plus.tv.credentials import remove, restrict
+from stremio_plus_plus.tv.credentials import private_umask, remove, restrict
 from stremio_plus_plus.tv.keys import ANDROID, native_keys
 
 
@@ -65,16 +65,20 @@ class AndroidTvRemote:
     async def pair(self, ask_code: CodePrompt) -> None:
         client = self._client()
         self._cert_path.parent.mkdir(parents=True, exist_ok=True)
+        generated = False
         try:
-            await client.async_generate_cert_if_missing()
+            with private_umask():
+                generated = await client.async_generate_cert_if_missing()
             restrict(self._cert_path, self._key_path)
             await client.async_start_pairing()
             await client.async_finish_pairing(normalize_code(await ask_code()))
         except (InvalidAuth, CannotConnect, ConnectionClosed) as exc:
-            remove(self._cert_path, self._key_path)
+            if generated:  # the TV never accepted it; an older, accepted cert stays
+                remove(self._cert_path, self._key_path)
             raise _translate(exc) from exc
         except BaseException:  # cancelled, Ctrl-C at the code prompt…: no half-made pairing
-            remove(self._cert_path, self._key_path)
+            if generated:
+                remove(self._cert_path, self._key_path)
             raise
         finally:
             client.disconnect()
