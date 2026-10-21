@@ -71,3 +71,11 @@ def test_secrets_are_private_and_clearable(tmp_path: Path) -> None:
     assert f.secrets.anthropic_api_key is None
     with pytest.raises(SettingsError):
         f.set_secret("nope", "x")
+
+
+def test_a_broken_secrets_file_never_echoes_the_secret(tmp_path: Path) -> None:
+    f = SettingsFile(tmp_path)
+    f.secrets_path.write_text('anthropic_api_kye = "sk-ant-very-secret"\n')
+    _touch_later(f.secrets_path)
+    f.refresh()
+    assert f.error == "secrets.toml: invalid or unknown key(s): anthropic_api_kye"
