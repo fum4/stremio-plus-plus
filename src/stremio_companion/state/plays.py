@@ -56,6 +56,9 @@ class Plays:
         ).fetchall()
         return [_row(r) for r in rows]
 
+    def forget_torrent(self, info_hash: str) -> None:
+        self._conn.execute("DELETE FROM file_plays WHERE info_hash = ?", (info_hash,))
+
     def forget(self, info_hash: str, file_index: int) -> None:
         self._conn.execute(
             "DELETE FROM file_plays WHERE info_hash = ? AND file_index = ?", (info_hash, file_index)

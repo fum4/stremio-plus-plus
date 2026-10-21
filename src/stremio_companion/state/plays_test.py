@@ -32,3 +32,11 @@ def test_migrations_are_idempotent_across_reopen(tmp_path: Path) -> None:
     open_db(tmp_path / "state.db").close()
     conn = open_db(tmp_path / "state.db")
     assert conn.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
+
+
+def test_forget_torrent(tmp_path: Path) -> None:
+    plays = Plays(open_db(tmp_path / "state.db"))
+    plays.record(_play(0, 1.0))
+    plays.record(_play(1, 2.0))
+    plays.forget_torrent(IH)
+    assert plays.last_played_per_torrent() == {}
