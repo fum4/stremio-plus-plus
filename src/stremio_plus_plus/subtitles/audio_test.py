@@ -28,7 +28,9 @@ def test_no_audio() -> None:
 
 
 @pytest.mark.asyncio
-async def test_ffmpeg_and_ffprobe_only_speak_http(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_ffmpeg_and_ffprobe_only_speak_http_and_https(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls: list[tuple[str, ...]] = []
 
     async def fake_run(*argv: str, timeout_s: float) -> bytes:
@@ -40,6 +42,6 @@ async def test_ffmpeg_and_ffprobe_only_speak_http(monkeypatch: pytest.MonkeyPatc
     await audio.read_chunk("http://srv/x?src=companion", AudioTrack(0, True, 10.0), 0.0, 1.0)
     for argv in calls:
         whitelist = argv.index("-protocol_whitelist")
-        assert argv[whitelist + 1] == "http,tcp"
+        assert argv[whitelist + 1] == "http,https,tcp,tls"  # never file:, never playlists
         if "-i" in argv:
             assert whitelist < argv.index("-i")

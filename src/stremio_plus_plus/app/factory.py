@@ -11,7 +11,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from stremio_plus_plus.app.addon import addon_router, lan_router
 from stremio_plus_plus.app.https_guard import HttpsGuard
+from stremio_plus_plus.app.picker import Picker
 from stremio_plus_plus.app.services import Services
+from stremio_plus_plus.app.stream_routes import router as stream_router
+from stremio_plus_plus.app.subtitle_switch import SubtitleSwitch
 from stremio_plus_plus.config.env import Env
 from stremio_plus_plus.downloads.disk import free_bytes
 from stremio_plus_plus.downloads.manager import DownloadManager
@@ -19,6 +22,7 @@ from stremio_plus_plus.downloads.pins import Pinner
 from stremio_plus_plus.server.client import StremioServer
 from stremio_plus_plus.state.db import open_db
 from stremio_plus_plus.state.plays import Plays
+from stremio_plus_plus.stream.sessions import Sessions
 from stremio_plus_plus.subtitles.jobs import SubtitleJobs
 from stremio_plus_plus.subtitles.store import SubtitleStore
 from stremio_plus_plus.subtitles.stt import WhisperMlx
@@ -47,6 +51,8 @@ def create_app(env: Env) -> FastAPI:
             downloads = DownloadManager(
                 server, pinner, lambda: free_bytes(cache_dir), subtitles.prepare_next
             )
+            sessions = Sessions(env.companion_data_dir / "hls")
+            handlers = [PlayRecorder(server, plays), downloads, subtitles]
             services = Services(
                 env=env,
                 http=http,
@@ -57,19 +63,22 @@ def create_app(env: Env) -> FastAPI:
                 downloads=downloads,
                 subtitle_store=subtitle_store,
                 subtitles=subtitles,
+                picker=Picker(http, server, env.companion_data_dir),
+                sessions=sessions,
+                playback_handlers=handlers,
             )
             app.state.services = services
             workers = [
                 asyncio.create_task(
                     run_tracker(
-                        follow(env.stremio_server_log),
-                        [PlayRecorder(server, plays), downloads, subtitles],
+                        follow(env.stremio_server_log), [*handlers, SubtitleSwitch(services)]
                     ),
                     name="tracker",
                 ),
                 asyncio.create_task(downloads.run_sweeper(), name="pin-sweeper"),
                 asyncio.create_task(subtitles.run(), name="subtitles"),
                 asyncio.create_task(whisper.warm(), name="whisper-warm"),
+                asyncio.create_task(sessions.run_reaper(), name="hls-reaper"),
             ]
             log.info(
                 "companion_started", data_dir=str(env.companion_data_dir), cache_dir=str(cache_dir)
@@ -79,6 +88,7 @@ def create_app(env: Env) -> FastAPI:
             finally:
                 for worker in workers:
                     worker.cancel()
+                await sessions.close()
                 await pinner.close()
                 db.close()
 
@@ -93,6 +103,7 @@ def create_app(env: Env) -> FastAPI:
     # Stremio clients fetch addon resources cross-origin.
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"])
     app.include_router(addon_router)
+    app.include_router(stream_router)
     app.include_router(lan_router)
     app.add_middleware(HttpsGuard, https_port=env.addon_https_port, token=env.addon_token)
 

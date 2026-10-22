@@ -18,6 +18,7 @@ from stremio_plus_plus.subtitles import audio
 from stremio_plus_plus.subtitles.constants import (
     MAX_WINDOW_FAILURES,
     OVERLAP_S,
+    PRIME_S,
     RETRY_FAILED_AFTER_S,
     TAIL_READ_FRACTION,
 )
@@ -48,6 +49,8 @@ class _Job:
     dead: bool = False
     failed_at: float = 0.0
     queued_ahead: bool = False  # the next episode, not playing yet: fill from the start
+    wanted: bool = False  # the viewer picked the track; until then only PRIME_S ahead
+    url: str | None = None  # a direct (debrid) link; torrent files are read via the server
 
     def playhead_s(self) -> float:
         return self.playhead_fraction * (self.meta.duration_s if self.meta else 0.0)
@@ -79,12 +82,19 @@ class SubtitleJobs:
         self._jobs: dict[FileKey, _Job] = {}
         self._wake = asyncio.Event()
 
-    def ensure(self, info_hash: str, file_index: int, file_name: str, file_length: int) -> None:
+    def ensure(
+        self,
+        info_hash: str,
+        file_index: int,
+        file_name: str,
+        file_length: int,
+        url: str | None = None,
+    ) -> None:
         """Called on every subtitles request; the job starts (or wakes) and gets priority."""
         key = (info_hash, file_index)
         job = self._jobs.get(key)
         if job is None:
-            job = self._jobs[key] = _Job(info_hash, file_index, file_name, file_length)
+            job = self._jobs[key] = _Job(info_hash, file_index, file_name, file_length, url=url)
             job.meta = self._store.file(info_hash, file_index)
         job.queued_ahead = False  # it's on screen now
         now = self._clock()
@@ -94,6 +104,13 @@ class SubtitleJobs:
         job.last_active = now
         self._wake.set()
 
+    def want(self, info_hash: str, file_index: int) -> None:
+        """The viewer picked our track for this file: generate all of it, not just the start."""
+        job = self._jobs.get((info_hash, file_index))
+        if job is not None and not job.wanted:
+            job.wanted = True
+            self._wake.set()
+
     def prepare_next(
         self, info_hash: str, playing_index: int, file_index: int, file_name: str, file_length: int
     ) -> None:
@@ -102,11 +119,12 @@ class SubtitleJobs:
         track (the player loads a subtitle file once per selection, at the episode's start)."""
         playing = self._jobs.get((info_hash, playing_index))
         key = (info_hash, file_index)
-        if playing is None or key in self._jobs:
+        if playing is None or not playing.wanted or key in self._jobs:
             return
         job = self._jobs[key] = _Job(info_hash, file_index, file_name, file_length)
         job.meta = self._store.file(info_hash, file_index)
         job.queued_ahead = True
+        job.wanted = True
         job.last_active = 0.0  # after every file actually being watched
         log.info("subtitles_queued_next_episode", file=file_name)
         self._wake.set()
@@ -186,14 +204,20 @@ class SubtitleJobs:
                 window = next_fill(covered, job.meta.duration_s)
             else:
                 window = next_window(covered, job.meta.duration_s, job.playhead_s())
+                head = job.playhead_s()
+                if window and not job.wanted and not head <= window[0] <= head + PRIME_S:
+                    window = None  # nobody picked the track (yet): don't spend Claude calls
             if window is not None:
                 return job, window
         return None, None
 
+    def _url(self, job: _Job) -> str:
+        return job.url or self._server.file_url(job.info_hash, job.file_index)
+
     async def _prepare(self, job: _Job) -> None:
         # Hash computed by the server from the file itself: a client-supplied hash could make
         # another file reuse the wrong subtitles.
-        video_hash = await self._server.opensub_hash(job.info_hash, job.file_index)
+        video_hash = await self._server.opensub_hash(self._url(job))
         same = self._store.find_same_video(video_hash, job.file_length) if video_hash else None
         if same and (same.info_hash, same.file_index) != (job.info_hash, job.file_index):
             job.meta = SubtitleFile(
@@ -210,7 +234,7 @@ class SubtitleJobs:
             self._store.copy_spans(same, job.info_hash, job.file_index)
             log.info("subtitles_reused_from_same_video", file=job.file_name)
             return
-        track = await audio.probe(self._server.file_url(job.info_hash, job.file_index))
+        track = await audio.probe(self._url(job))
         if track is None:
             job.dead = True
             job.failed_at = self._clock()
@@ -240,9 +264,7 @@ class SubtitleJobs:
         start, end = window
         read_from = max(0.0, start - OVERLAP_S)
         track = audio.AudioTrack(job.meta.audio_stream, job.meta.center, job.meta.duration_s)
-        samples = await audio.read_chunk(
-            self._server.file_url(job.info_hash, job.file_index), track, read_from, end - read_from
-        )
+        samples = await audio.read_chunk(self._url(job), track, read_from, end - read_from)
         t1 = self._clock()
         heard = await self._stt.transcribe(samples, read_from)
         t2 = self._clock()

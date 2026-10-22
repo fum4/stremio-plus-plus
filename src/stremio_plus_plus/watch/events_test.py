@@ -1,6 +1,12 @@
 import pytest
 
-from stremio_plus_plus.watch.events import EngineCreated, EngineDestroyed, FileRequested, parse_line
+from stremio_plus_plus.watch.events import (
+    EngineCreated,
+    EngineDestroyed,
+    FileRequested,
+    SubtitleFetched,
+    parse_line,
+)
 
 IH = "6778f903610f20668ecdacea68162e974f0201a8"
 
@@ -34,3 +40,8 @@ def test_parses_playback_lines(line: str, expected: object) -> None:
 )
 def test_ignores_everything_else(line: str) -> None:
     assert parse_line(line) is None
+
+
+def test_subtitle_tracks_loaded_through_the_server_are_seen() -> None:
+    line = "-> GET /subtitles.vtt?from=https%3A%2F%2Fsubs5.strem.io%2Fen%2Ffile%2F19 "
+    assert parse_line(line) == SubtitleFetched("https://subs5.strem.io/en/file/19")

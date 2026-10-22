@@ -10,6 +10,7 @@ from pydantic import AnyHttpUrl
 
 from stremio_plus_plus.app import addon
 from stremio_plus_plus.app.addon import addon_router, lan_router
+from stremio_plus_plus.app.picker import Picker
 from stremio_plus_plus.app.services import Services
 from stremio_plus_plus.config.env import Env
 from stremio_plus_plus.downloads.manager import DownloadManager
@@ -18,6 +19,7 @@ from stremio_plus_plus.server.client import StremioServer
 from stremio_plus_plus.server.constants import SUBTITLE_PROXY_TIMEOUT_S
 from stremio_plus_plus.state.db import open_db
 from stremio_plus_plus.state.plays import Plays
+from stremio_plus_plus.stream.sessions import Sessions
 from stremio_plus_plus.subtitles.cues import Cue
 from stremio_plus_plus.subtitles.jobs import SubtitleJobs
 from stremio_plus_plus.subtitles.store import SubtitleStore
@@ -81,6 +83,9 @@ def _client_and_jobs(tmp_path: Path) -> tuple[TestClient, SubtitleStore, Subtitl
         downloads=DownloadManager(server, pinner, lambda: 0),
         subtitle_store=store,
         subtitles=jobs,
+        picker=Picker(http, server, tmp_path),
+        sessions=Sessions(tmp_path / "hls"),
+        playback_handlers=[],
     )
     return TestClient(app), store, jobs
 
