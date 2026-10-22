@@ -13,11 +13,17 @@ import contextlib
 import math
 import os
 import signal
+import subprocess
 from pathlib import Path
 
 import structlog
 
-from stremio_plus_plus.stream.constants import SEGMENT_S, SYSTEM_B_AUDIO, TS_OFFSET_S
+from stremio_plus_plus.stream.constants import (
+    SEGMENT_S,
+    STOP_TIMEOUT_S,
+    SYSTEM_B_AUDIO,
+    TS_OFFSET_S,
+)
 from stremio_plus_plus.stream.media import PROTOCOLS, Media, keyframe_at
 
 log = structlog.get_logger()
@@ -66,7 +72,8 @@ class Producer:
         self.total = segment_count(media.duration_s)
         self.kept_from = first  # segments before this were deleted
         self._head = first
-        self._proc: asyncio.subprocess.Process | None = None
+        self.started_at = 0.0
+        self._proc: subprocess.Popen[bytes] | None = None
         self._paused = False
 
     async def start(self) -> None:
@@ -74,18 +81,28 @@ class Producer:
         packet = await keyframe_at(self.url, self.media.start_s + self.first * SEGMENT_S)
         times = cut_times(self.media, self.first, packet)
         argv = command(self.url, self.media, self.first, times, self.dir)
-        self._proc = await asyncio.create_subprocess_exec(
-            *argv, stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.DEVNULL
+        # A plain Popen, polled with WNOHANG: asyncio's child watcher on macOS blocks the event
+        # loop in waitpid() once the child is SIGSTOPped (pause()), freezing the whole app.
+        # stderr discarded: ffmpeg's errors quote the input URL, and debrid links are secrets.
+        self._proc = subprocess.Popen(
+            argv,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
         log.info("stream_producer_started", first=self.first, total=self.total)
 
     @property
     def done(self) -> bool:
-        return self._proc is not None and self._proc.returncode is not None
+        return self._proc is not None and self._proc.poll() is not None
 
     @property
     def failed(self) -> bool:
-        return self.done and self._proc is not None and self._proc.returncode != 0
+        return self.done and self._proc is not None and self._proc.poll() != 0
+
+    @property
+    def returncode(self) -> int | None:
+        return self._proc.poll() if self._proc is not None else None
 
     def head(self) -> int:
         """Index of the segment being written now (the newest file present)."""
@@ -119,4 +136,9 @@ class Producer:
         with contextlib.suppress(ProcessLookupError):
             self.pause(False)  # a stopped process can't act on SIGTERM
             self._proc.terminate()
-        await self._proc.wait()
+        try:
+            await asyncio.to_thread(self._proc.wait, STOP_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            with contextlib.suppress(ProcessLookupError):
+                self._proc.kill()
+            await asyncio.to_thread(self._proc.wait)

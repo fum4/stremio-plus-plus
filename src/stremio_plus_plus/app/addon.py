@@ -26,7 +26,7 @@ def require_token(request: Request, token: str) -> None:
 
 
 log = structlog.get_logger()
-HLS_START_WAIT_S = 5.0
+HLS_START_WAIT_S = 3.0
 addon_router = APIRouter(prefix="/{token}", dependencies=[Depends(require_token)])
 lan_router = APIRouter()
 
@@ -93,17 +93,16 @@ async def srt(request: Request, info_hash: str, file_index: int) -> PlainTextRes
     jobs = services.subtitles
     jobs.want(info_hash, file_index)
     session = services.sessions.playing(info_hash, file_index)
-    waited_for_stream = 0.0
+    waited = 0.0  # one budget for everything below: server.js gives up on us at ~10 s
     while session is None and services.picker.offered_file(info_hash, file_index):
-        if waited_for_stream >= HLS_START_WAIT_S:  # the viewer picked another release of it
+        if waited >= HLS_START_WAIT_S:  # the viewer picked another source of the same file
             break
         await asyncio.sleep(0.5)  # remembered track fetched as our stream is still opening
-        waited_for_stream += 0.5
+        waited += 0.5
         session = services.sessions.playing(info_hash, file_index)
     if session is not None:
-        return await switch_on(services, session)
+        return await switch_on(services, session, FIRST_ANSWER_WAIT_S - waited)
     cues = jobs.cues(info_hash, file_index)
-    waited = 0.0
     # The player fetches this once per track selection (and auto-selects a remembered language
     # as the episode loads): a few seconds' wait for the first window beats the placeholder.
     while not cues and jobs.generating(info_hash, file_index) and waited < FIRST_ANSWER_WAIT_S:

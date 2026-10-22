@@ -15,7 +15,6 @@ from fastapi.responses import PlainTextResponse
 
 from stremio_plus_plus.app.services import Services
 from stremio_plus_plus.stream.session import Session
-from stremio_plus_plus.subtitles.constants import FIRST_ANSWER_WAIT_S
 from stremio_plus_plus.subtitles.cues import Cue, render_srt
 from stremio_plus_plus.subtitles.scheduler import merged
 from stremio_plus_plus.watch.events import Event, SubtitleFetched
@@ -34,20 +33,21 @@ def _covered(services: Services, session: Session, start: float, end: float) -> 
     return any(s <= start and end <= e for s, e in spans)
 
 
-async def switch_on(services: Services, session: Session) -> PlainTextResponse:
+async def switch_on(services: Services, session: Session, budget_s: float) -> PlainTextResponse:
+    """`budget_s`: what's left of the proxy's patience for this fetch (it gives up at ~10 s)."""
     source = session.source
     session.subtitles_on = True
     services.subtitles.want(source.info_hash, source.file_index)
-    until = session.vtt_served_until
-    start = min(session.playhead_s, until)
+    # Exactly the subtitle segments buffered since the last seek, which went out empty.
+    start, until = session.vtt_run_start, session.vtt_served_until
     waited = 0.0
-    while until > start and not _covered(services, session, start, until):
-        if waited >= FIRST_ANSWER_WAIT_S:  # the proxy gives up at ~10 s: answer with what exists
-            break
+    while until > start and not _covered(services, session, start, until) and waited < budget_s:
         await asyncio.sleep(0.5)
         waited += 0.5
     cues = [
-        c for c in services.subtitles.cues(source.info_hash, source.file_index) if c.start < until
+        c
+        for c in services.subtitles.cues(source.info_hash, source.file_index)
+        if start <= c.start < until
     ]
     log.info(
         "stream_subtitles_on",

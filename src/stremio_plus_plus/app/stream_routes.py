@@ -13,6 +13,7 @@ from stremio_plus_plus.app.services import Services
 from stremio_plus_plus.stream import playlists
 from stremio_plus_plus.stream.constants import SEGMENT_S
 from stremio_plus_plus.stream.media import UnsupportedMediaError
+from stremio_plus_plus.stream.producer import segment_count
 from stremio_plus_plus.stream.session import SegmentUnavailableError, Session
 from stremio_plus_plus.subtitles.constants import LANG
 from stremio_plus_plus.watch.events import FileRequested
@@ -102,11 +103,22 @@ async def video_segment(request: Request, key: str, index: int) -> FileResponse:
     session = await _session(services, key)
     try:
         path = await session.segment(index)
+    except IndexError:
+        raise HTTPException(status_code=404) from None
     except SegmentUnavailableError as e:
         log.warning("stream_segment_unavailable", file=session.source.file_name, reason=str(e))
         raise HTTPException(status_code=503) from None
-    await _report_playhead(services, session, index)
+    if abs(index - session.last_reported) >= REPORT_EVERY:  # every ~30 s, and at once on a seek
+        session.last_reported = index
+        # In the background: the handlers ask the busy streaming server things, the TV waits.
+        task = asyncio.create_task(_report_playhead(services, session, index))
+        _reports.add(task)
+        task.add_done_callback(_reports.discard)
     return FileResponse(path, media_type="video/mp2t")
+
+
+_reports: set[asyncio.Task[None]] = set()
+REPORT_EVERY = 5  # segments (~30 s): pins and the subtitle playhead need no finer grain
 
 
 async def _report_playhead(services: Services, session: Session, index: int) -> None:
@@ -128,8 +140,10 @@ async def subtitle_segment(request: Request, key: str, index: int) -> Response:
     services = services_of(request)
     session = await _session(services, key)
     media = await session.media()
+    if not 0 <= index < segment_count(media.duration_s):
+        raise HTTPException(status_code=404)
     start, end = playlists.segment_window(index)
-    session.vtt_served_until = max(session.vtt_served_until, end)
+    session.served_vtt(index)
     cues: list[tuple[float, float, str]] = []
     if session.subtitles_on:
         source = session.source

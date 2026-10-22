@@ -26,5 +26,11 @@ POLL_S = 0.2
 # Sessions untouched this long are stopped (paused playback resumes with a restart).
 IDLE_STOP_S = 300.0
 PROBE_TIMEOUT_S = 120.0
+# A run that failed this recently at the requested segment isn't relaunched (bad link, missing
+# file): the request fails instead of spawning ffmpeg every poll.
+FAILED_RETRY_S = 10.0
+STOP_TIMEOUT_S = 5.0  # SIGTERM, then SIGKILL
+# A replaced run's directory outlives it a little: a response may still be streaming from it.
+OLD_RUN_GRACE_S = 60.0
 # The player buffers subtitle segments ahead; while subtitles are off, they're served empty.
 VTT_EMPTY = "WEBVTT\nX-TIMESTAMP-MAP=MPEGTS:{mpegts},LOCAL:00:00:00.000\n\n"

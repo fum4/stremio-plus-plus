@@ -104,7 +104,8 @@ class Picker:
         if c.binge_group and offer.item_id:
             self._last_group[_show(offer.item_id)] = c.binge_group
         if c.info_hash is None:  # a direct (debrid) link: subtitles keyed by the link itself
-            return Source(key, c.url or "", *offer.file, c.filename, c.size_bytes)
+            # Size unknown for most links; any constant works for playhead fractions.
+            return Source(key, c.url or "", *offer.file, c.filename, c.size_bytes or 1 << 40)
         engine = await self._server.create(c.info_hash, c.trackers)
         index = c.file_index if c.file_index is not None else _largest(engine.files)
         file = engine.file(index)
