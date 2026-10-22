@@ -7,6 +7,9 @@ from pathlib import Path
 import httpx
 from pydantic import AnyHttpUrl
 
+from stremio_plus_plus.account.api import StremioApi
+from stremio_plus_plus.account.credentials import AuthFile
+from stremio_plus_plus.account.service import StremioAccount
 from stremio_plus_plus.app.picker import Picker
 from stremio_plus_plus.app.services import HostInfo, Services
 from stremio_plus_plus.app.tv_service import TvService
@@ -14,6 +17,7 @@ from stremio_plus_plus.config.env import Env
 from stremio_plus_plus.config.settings_file import SettingsFile
 from stremio_plus_plus.downloads.manager import DownloadManager
 from stremio_plus_plus.downloads.pins import Pinner
+from stremio_plus_plus.log.hub import HUB
 from stremio_plus_plus.server.client import StremioServer
 from stremio_plus_plus.state.activity import ActivityStore
 from stremio_plus_plus.state.db import open_db
@@ -86,5 +90,14 @@ def make_services(tmp_path: Path, handler: Callable[[httpx.Request], httpx.Respo
         model_download=ModelDownload(),
         clients=ClientMonitor(tmp_path),
         activity=ActivityStore(db),
+        account=StremioAccount(
+            StremioApi(http, "https://api.test"),
+            AuthFile(tmp_path),
+            "io.github.fum4.stremio-plus-plus",
+            {"id": "io.github.fum4.stremio-plus-plus"},
+            lambda: None,
+            lambda: True,
+            HUB.add_secret,  # as in factory.py: the key is redacted from every log view
+        ),
         tv=TvService(env, settings_file),
     )

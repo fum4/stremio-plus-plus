@@ -70,6 +70,18 @@ The UI's **Activity** page has two tabs:
 
 What we can and can't see is in the PR. In short: no client IPs or timestamps in server.log, nothing from inside the TV app. Secrets are redacted on the way in (the authKey server.js prints, the addon token, API keys).
 
+## Stremio account (built)
+Optional: a setup step ("Stremio account", skippable) and the **Stremio** page (formerly Install).
+- **Connect:**
+  - Email + password: one `login` call; only the returned authKey is kept.
+  - Google/Facebook sign-ins: paste the key from web.stremio.com's console, `JSON.parse(localStorage.getItem("profile")).auth.key`; stremio-core keeps the profile under `profile` with `auth.key`.
+  - The key is checked with `getUser` before it's stored.
+- **Storage:** `<data dir>/stremio-auth.json` as `{"authKey"}`, mode 600 (the same file and format set up by hand on the owner's host). It never goes in config.toml, and the log hub redacts it. Disconnecting forgets it locally without calling `logout`, because other tools on the host may share the session.
+- **Install in one click:** `addonCollectionSet` with Stremio++ (manifest from the addon itself) at index 0. Every other addon is kept exactly as returned, in order (`account/collection.py`).
+- **Keep it first** (`[stremio] keep_addon_first`, default on): a check 30 s after start and every 10 min. It reorders, and repoints the entry if this host's addon URL changed (e.g. moving to the zero-config certificate), so no reinstall is needed. It never installs by itself: removing the addon is the user's call.
+- **Setup:** the addon step ticks itself from the account's collection when connected.
+- Groundwork for later: CORE reading the installed stream addons, and library/watch-progress prefetch.
+
 ## Next
 1. **Profiles + languages (decision 2):** `languages = [...]` per install URL, `behaviorHints.configurable` + `/configure` page; STT once per file, translation per language (store keyed by language, append-only migration); one prompt template per language.
 2. **`openai-compatible` backend** (covers local models), then benchmark candidates on Batman.

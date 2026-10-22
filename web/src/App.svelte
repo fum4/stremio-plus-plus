@@ -9,7 +9,7 @@
   import Overview from "./pages/Overview.svelte";
   import SubtitlesPage from "./pages/Subtitles.svelte";
   import Downloads from "./pages/Downloads.svelte";
-  import Install from "./pages/Install.svelte";
+  import Stremio from "./pages/Stremio.svelte";
   import Setup from "./pages/Setup.svelte";
   import Activity from "./pages/Activity.svelte";
 
@@ -18,7 +18,7 @@
     activity: { label: "Activity", icon: ActivityIcon, component: Activity },
     subtitles: { label: "Subtitles", icon: Subtitles, component: SubtitlesPage },
     downloads: { label: "Downloads", icon: HardDriveDownload, component: Downloads },
-    install: { label: "Install", icon: Link2, component: Install },
+    stremio: { label: "Stremio", icon: Link2, component: Stremio },
     setup: { label: "Setup", icon: ListChecks, component: Setup },
   } as const;
   type PageId = keyof typeof pages;

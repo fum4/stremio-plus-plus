@@ -1,6 +1,6 @@
 import type { SetupCheck, SetupState } from "../../lib/types";
 
-export type StepId = "machine" | "server" | "translator" | "model" | "tv" | "addon";
+export type StepId = "machine" | "server" | "translator" | "model" | "tv" | "account" | "addon";
 
 export interface Step {
   id: StepId;
@@ -24,7 +24,21 @@ export const STEPS: Step[] = [
     // Fallback when the TV's requests can't be seen yet (e.g. it connected before this update).
     confirm: "The TV shows the server as online",
   },
-  { id: "addon", title: "The addon", blurb: "Add Stremio++ to your account", checks: [], confirm: "Stremio++ is installed in my account" },
+  {
+    id: "account",
+    title: "Stremio account",
+    blurb: "Optional: one-click addon, kept on top",
+    checks: ["account"],
+    confirm: "Skip: I'll install the addon by hand",
+  },
+  {
+    id: "addon",
+    title: "The addon",
+    blurb: "Add Stremio++ to your account",
+    checks: ["addon_installed"],
+    // Without a connected account the install can't be seen: the user confirms it.
+    confirm: "Stremio++ is installed in my account",
+  },
 ];
 
 const CONFIRM_KEY = "stremio-plus-plus.setup.confirmed";

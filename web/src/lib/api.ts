@@ -12,6 +12,7 @@ import type {
   TvState,
   ActivityItem,
   LogEntry,
+  AccountState,
 } from "./types";
 
 export class ApiError extends Error {}
@@ -48,6 +49,13 @@ export const api = {
   setupModel: () => call<ModelDownload>("POST", "/setup/model"),
   modelProgress: () => call<ModelDownload>("GET", "/setup/model"),
   completeSetup: () => call<SetupState>("POST", "/setup/complete"),
+  account: () => call<AccountState>("GET", "/account"),
+  accountLogin: (email: string, password: string) =>
+    call<AccountState>("POST", "/account/login", { email, password }),
+  accountKey: (auth_key: string) => call<AccountState>("POST", "/account/key", { auth_key }),
+  accountLogout: () => call<AccountState>("POST", "/account/logout"),
+  accountInstall: () => call<AccountState>("POST", "/account/install"),
+  accountKeep: () => call<AccountState>("POST", "/account/keep"),
   logs: (after: number) => call<{ entries: LogEntry[]; cursor: number }>("GET", `/logs?after=${after}`),
   activity: (since: number) => call<{ items: ActivityItem[] }>("GET", `/activity?since=${since}`),
   activityBefore: (id: number) =>

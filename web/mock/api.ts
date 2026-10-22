@@ -24,6 +24,7 @@ let settings = {
     next_episodes: 1,
   },
   downloads: { min_free_gb: 3, stale_after_days: 7, next_episodes: 1 as number | string },
+  stremio: { keep_addon_first: true },
 };
 let version = 1;
 const secrets: Record<string, boolean> = { anthropic_api_key: false };
@@ -59,6 +60,30 @@ function tvView() {
     },
     can_drive: false,
     client_last_seen: tvState.connectedAt && now >= tvState.connectedAt ? tvState.connectedAt / 1000 : null,
+  };
+}
+
+// Stremio account: not connected; Stremio++ not installed; a typical addon list.
+const accountState = {
+  connected: false,
+  ours: null as number | null,
+  addons: ["Cinemeta", "Torrentio", "ThePirateBay+", "OpenSubtitles v3", "Local Files"],
+};
+function accountView() {
+  const names = [...accountState.addons];
+  if (accountState.ours !== null) names.splice(accountState.ours, 0, "Stremio++");
+  return {
+    connected: accountState.connected,
+    email: accountState.connected ? "alex@example.com" : null,
+    error: null,
+    position: accountState.connected ? accountState.ours : null,
+    url_current: true,
+    addons: accountState.connected
+      ? names.map((n) => ({ id: n.toLowerCase(), name: n, ours: n === "Stremio++" }))
+      : [],
+    keep_first: settings.stremio.keep_addon_first,
+    manifest_url:
+      "https://192-168-1-132.519b6502d940.stremio.rocks:8443/0f3c9b1e7d2a4c58b6e1f09a/manifest.json",
   };
 }
 
@@ -119,6 +144,20 @@ function setupView() {
         label: "TV connected",
         level: tvView().client_last_seen ? "ok" : "warn",
         detail: tvView().client_last_seen ? "a Stremio app is using this server" : "waiting for the TV",
+        fix: null,
+      },
+      {
+        id: "account",
+        label: "Stremio account",
+        level: accountState.connected ? "ok" : "warn",
+        detail: accountState.connected ? "alex@example.com" : "not connected (optional)",
+        fix: null,
+      },
+      {
+        id: "addon_installed",
+        label: "Stremio++ in your addons",
+        level: accountState.connected && accountState.ours !== null ? "ok" : "warn",
+        detail: accountState.ours !== null ? `installed, position ${accountState.ours + 1}` : "not installed yet",
         fix: null,
       },
       {
@@ -274,6 +313,23 @@ export function mockApi(): Plugin {
         }
         if (req.method === "POST" && path?.endsWith("/regenerate")) return send(res, { ok: true });
         if (req.method === "GET" && path === "/tv") return send(res, tvView());
+        if (req.method === "GET" && path === "/account") return send(res, accountView());
+        if (req.method === "POST" && (path === "/account/login" || path === "/account/key")) {
+          const b = (await body(req)) as { password?: string };
+          await new Promise((r) => setTimeout(r, 800));
+          if (b.password === "wrong") return send(res, { detail: "Wrong passphrase" }, 401);
+          accountState.connected = true;
+          return send(res, accountView());
+        }
+        if (req.method === "POST" && path === "/account/logout") {
+          accountState.connected = false;
+          return send(res, accountView());
+        }
+        if (req.method === "POST" && (path === "/account/install" || path === "/account/keep")) {
+          await new Promise((r) => setTimeout(r, 700));
+          accountState.ours = 0;
+          return send(res, accountView());
+        }
         if (req.method === "POST" && path === "/tv/discover") {
           await new Promise((r) => setTimeout(r, 2500));
           return send(res, FOUND);

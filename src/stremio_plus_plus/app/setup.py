@@ -142,6 +142,18 @@ async def _checks(services: Services) -> list[dict[str, Any]]:
             None,
         )
     )
+    account = await services.account.state()
+    signed_in = account.connected and not account.error
+    out.append(
+        _check(
+            "account",
+            "Stremio account",
+            "ok" if signed_in else "warn",
+            account.email or account.error or "not connected (optional)",
+            None,
+        )
+    )
+    out.append(_addon_check(account.position, account.url_current, signed_in))
     free = free_bytes(services.cache_dir)
     level: Level = "ok" if free >= DISK_OK else "warn" if free >= DISK_MIN else "bad"
     out.append(
@@ -154,6 +166,17 @@ async def _checks(services: Services) -> list[dict[str, Any]]:
         )
     )
     return out
+
+
+def _addon_check(position: int | None, url_current: bool, signed_in: bool) -> dict[str, Any]:
+    if position is not None and url_current:
+        detail = f"installed, position {position + 1}"
+    elif position is not None:
+        detail = "installed with an old address: reinstall"
+    else:
+        detail = "not installed yet" if signed_in else "can't check without the account"
+    ok = position is not None and url_current
+    return _check("addon_installed", "Stremio++ in your addons", "ok" if ok else "warn", detail)
 
 
 @router.get("")

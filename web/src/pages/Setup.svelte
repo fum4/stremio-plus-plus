@@ -14,6 +14,7 @@
   import ServerStep from "./setup/ServerStep.svelte";
   import { confirmed, saveConfirmed, STEPS, stepChecks, stepDone, type StepId } from "./setup/steps";
   import TvStep from "./setup/TvStep.svelte";
+  import AccountPanel from "../lib/components/AccountPanel.svelte";
 
   const POLL_MS = 3000;
   let ticked = $state(confirmed());
@@ -120,11 +121,21 @@
           <ModelStep done={done.has("model")} />
         {:else if step.id === "tv"}
           <TvStep />
+        {:else if step.id === "account"}
+          <AccountPanel compact onchange={() => void app.loadSetup()} />
         {:else if step.id === "addon"}
-          <AddonInstall url={setup.addon_url} />
+          {#if setup.checks.find((c) => c.id === "account")?.level === "ok"}
+            <AccountPanel compact onchange={() => void app.loadSetup()} />
+            <details class="byhand">
+              <summary>Or install it by hand</summary>
+              <AddonInstall url={setup.addon_url} />
+            </details>
+          {:else}
+            <AddonInstall url={setup.addon_url} />
+          {/if}
         {/if}
 
-        {#if step.checks.length && step.id !== "tv" && (step.id !== "model" || done.has("model"))}
+        {#if step.checks.length && !["tv", "account", "addon"].includes(step.id) && (step.id !== "model" || done.has("model"))}
           <div class="checks" class:block={step.id !== "machine"}>
             {#each stepChecks(setup, step) as check, i (check.id)}
               <div in:fly={{ y: 8, duration: 350, delay: i * 60 }}><CheckRow {check} /></div>
@@ -343,6 +354,17 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+  }
+
+  .byhand {
+    margin-top: 16px;
+    color: var(--text-dim);
+  }
+
+  .byhand summary {
+    cursor: pointer;
+    margin-bottom: 12px;
+    font-size: 13px;
   }
 
   .confirm {

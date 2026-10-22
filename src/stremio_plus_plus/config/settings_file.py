@@ -43,6 +43,9 @@ min_free_gb = 3                # never let downloads push the disk below this
 stale_after_days = 7           # delete torrents nobody played for this long
 next_episodes = 1              # download this many episodes ahead (0 = off), or "season"
 
+[stremio]                      # with a connected account (the setup, or the Stremio page)
+keep_addon_first = true        # keep Stremio++ first in your addons: its streams list on top
+
 [tv]                           # optional: a TV this Mac can control; the setup finds and pairs it
 # host = "192.168.1.134"
 # os = "samsung"               # samsung | webos | androidtv | firetv

@@ -8,6 +8,7 @@ from pathlib import Path
 
 import httpx
 
+from stremio_plus_plus.account.service import StremioAccount
 from stremio_plus_plus.app.picker import Picker
 from stremio_plus_plus.app.tv_service import TvService
 from stremio_plus_plus.config.env import Env
@@ -70,4 +71,5 @@ class Services:
     model_download: ModelDownload
     clients: ClientMonitor
     activity: ActivityStore
+    account: StremioAccount
     tv: TvService

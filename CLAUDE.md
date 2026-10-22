@@ -11,6 +11,7 @@ A Python service + launchd setup on the owner's Mac (**Batman**) that extends th
 - **server.js is a pinned, closed binary** (`infra/env/stremio-server.env`, sha256-verified). Tune it only through its settings / `POST /settings`, never by patching the bundle.
 - **Portable host.** Everything the Mac needs is in the repo: `Brewfile`, `.mise.toml`, `launchd/`, `scripts/`, `infra/env/`. No hand-tweaked machine state; Linux (systemd) must stay a template away.
 - **External subtitle tracks are loaded once per selection** (stremio-core): a served SRT is all the player will ever show from it. Live subtitles go inside our HLS stream instead (docs/design/hls-stream.md); the SRT for our own stream is only the bridge for segments already buffered.
+- **The Stremio authKey is a credential.** Only in `<data dir>/stremio-auth.json` (mode 600), never in config.toml, git or logs (log/hub.py redacts it); passwords are used for one login call and never stored.
 - **The translation model never sees timestamps.** Cue ids in, cue ids out; code re-applies timings and re-wraps (≤ 2 lines × ~42 chars).
 
 ## Layering (src/stremio_plus_plus/)
