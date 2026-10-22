@@ -53,6 +53,15 @@ class _Job:
         return self.playhead_fraction * (self.meta.duration_s if self.meta else 0.0)
 
 
+@dataclass(frozen=True)
+class _Heard:
+    cues: list[Cue]  # English, starting inside the window
+    started: float
+    audio_s: float  # slow when the torrent hasn't downloaded those pieces yet
+    whisper_s: float
+    done: float
+
+
 class SubtitleJobs:
     def __init__(
         self,
@@ -225,8 +234,7 @@ class SubtitleJobs:
             center=track.center,
         )
 
-    async def _hear(self, job: _Job, window: Span) -> tuple[list[Cue], float]:
-        """English cues starting inside the window, and when work on it started."""
+    async def _hear(self, job: _Job, window: Span) -> _Heard:
         assert job.meta is not None
         t0 = self._clock()
         start, end = window
@@ -235,11 +243,15 @@ class SubtitleJobs:
         samples = await audio.read_chunk(
             self._server.file_url(job.info_hash, job.file_index), track, read_from, end - read_from
         )
+        t1 = self._clock()
         heard = await self._stt.transcribe(samples, read_from)
-        return [c for c in heard if start <= c.start < end], t0
+        t2 = self._clock()
+        own = [c for c in heard if start <= c.start < end]
+        return _Heard(own, t0, t1 - t0, t2 - t1, t2)
 
-    async def _translate(self, job: _Job, window: Span, heard: tuple[list[Cue], float]) -> None:
-        own, t0 = heard
+    async def _translate(self, job: _Job, window: Span, heard: _Heard) -> None:
+        own = heard.cues
+        t3 = self._clock()  # after the previous window's translation, if it was still running
         try:
             earlier = self._store.cues(job.info_hash, job.file_index)
             context = [c.text for c in earlier if c.start < window[0]]
@@ -256,7 +268,11 @@ class SubtitleJobs:
                 start=round(window[0], 1),
                 end=round(window[1], 1),
                 cues=len(cues),
-                seconds=round(self._clock() - t0, 1),
+                seconds=round(self._clock() - heard.started, 1),
+                audio_s=round(heard.audio_s, 1),
+                whisper_s=round(heard.whisper_s, 1),
+                wait_s=round(t3 - heard.done, 1),
+                claude_s=round(self._clock() - t3, 1),
             )
         finally:
             job.in_flight.remove(window)
