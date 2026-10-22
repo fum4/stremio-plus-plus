@@ -18,8 +18,12 @@ export interface SpeechSettings {
 }
 
 export interface Settings {
-  subtitles: { translator: TranslatorSettings; speech: SpeechSettings };
-  downloads: { min_free_gb: number; stale_after_days: number };
+  subtitles: { translator: TranslatorSettings; speech: SpeechSettings; next_episodes: number };
+  downloads: {
+    min_free_gb: number;
+    stale_after_days: number;
+    next_episodes: number | "season";
+  };
 }
 
 export interface SettingsView {

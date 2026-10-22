@@ -78,7 +78,7 @@ async def test_the_next_episode_is_announced_even_when_already_downloaded() -> N
     pinner = Pinner(fake.http, fake.client)
     seen: list[tuple[str, int, int, str, int]] = []
 
-    def hook(info_hash: str, playing: int, index: int, name: str, length: int) -> None:
+    def hook(info_hash: str, playing: int, index: int, name: str, length: int, d: int) -> None:
         seen.append((info_hash, playing, index, name, length))
 
     manager = DownloadManager(fake.client, pinner, lambda: 100 * GB, lambda: MIN_FREE_BYTES, hook)
@@ -93,3 +93,53 @@ async def test_engine_destroyed_drops_pins() -> None:
     await manager(FileRequested(IH, 1, 0))
     await manager(EngineDestroyed(IH))
     assert pinner.pinned() == set()
+
+
+SEASON = {
+    IH: {
+        "name": "Show S01",
+        "files": [{"name": f"Show.S01E0{i}.mkv", "length": 2 * GB} for i in range(1, 7)],
+    }
+}
+
+
+def _lookahead_manager(
+    free: int, lookahead: tuple[int | None, int]
+) -> tuple[DownloadManager, Pinner, list[tuple[int, int]]]:
+    fake = FakeServer(SEASON, {})
+    pinner = Pinner(fake.http, fake.client)
+    seen: list[tuple[int, int]] = []
+
+    def hook(info_hash: str, playing: int, index: int, name: str, length: int, d: int) -> None:
+        seen.append((index, d))
+
+    manager = DownloadManager(
+        fake.client, pinner, lambda: free, lambda: MIN_FREE_BYTES, hook, lambda: lookahead
+    )
+    return manager, pinner, seen
+
+
+@pytest.mark.asyncio
+async def test_downloads_n_episodes_ahead_and_subtitles_the_nearest_ones() -> None:
+    manager, pinner, seen = _lookahead_manager(100 * GB, (3, 2))
+    await manager(FileRequested(IH, 0, 0))
+    assert pinner.pinned() == {(IH, 0), (IH, 1), (IH, 2), (IH, 3)}
+    assert seen == [(1, 1), (2, 2)]
+    await pinner.close()
+
+
+@pytest.mark.asyncio
+async def test_the_whole_season_stops_at_the_disk_reserve() -> None:
+    # Room for two more 2 GB episodes above the 3 GB reserve, not five.
+    manager, pinner, _ = _lookahead_manager(MIN_FREE_BYTES + 5 * GB, (None, 0))
+    await manager(FileRequested(IH, 0, 0))
+    assert pinner.pinned() == {(IH, 0), (IH, 1), (IH, 2)}
+    await pinner.close()
+
+
+@pytest.mark.asyncio
+async def test_zero_ahead_downloads_and_subtitles_nothing_extra() -> None:
+    manager, pinner, seen = _lookahead_manager(100 * GB, (0, 0))
+    await manager(FileRequested(IH, 0, 0))
+    assert pinner.pinned() == {(IH, 0)} and seen == []
+    await pinner.close()

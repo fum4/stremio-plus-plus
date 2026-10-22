@@ -21,8 +21,9 @@ let settings = {
       model: "mlx-community/whisper-large-v3-turbo",
       source_language: "en",
     },
+    next_episodes: 1,
   },
-  downloads: { min_free_gb: 3, stale_after_days: 7 },
+  downloads: { min_free_gb: 3, stale_after_days: 7, next_episodes: 1 as number | string },
 };
 let version = 1;
 const secrets: Record<string, boolean> = { anthropic_api_key: false };

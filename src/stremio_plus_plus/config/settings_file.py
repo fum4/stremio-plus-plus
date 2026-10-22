@@ -30,6 +30,9 @@ timeout_s = 180
 context_cues = 15              # earlier subtitles sent along for continuity
 style = ""                     # optional: how the translation should sound, e.g. "like a cowboy"
 
+[subtitles]
+next_episodes = 1              # episodes ahead to subtitle whole (0 = off; <= downloads')
+
 [subtitles.speech]
 engine = "mlx-whisper"         # Apple Silicon
 model = "mlx-community/whisper-large-v3-turbo"
@@ -38,6 +41,7 @@ source_language = "en"
 [downloads]
 min_free_gb = 3                # never let downloads push the disk below this
 stale_after_days = 7           # delete torrents nobody played for this long
+next_episodes = 1              # download this many episodes ahead (0 = off), or "season"
 
 [tv]                           # optional: a TV this Mac can control; the setup finds and pairs it
 # host = "192.168.1.134"

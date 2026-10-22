@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { HardDrive, Recycle } from "@lucide/svelte";
+  import { HardDrive, ListVideo, Recycle } from "@lucide/svelte";
+  import Segmented from "../lib/components/Segmented.svelte";
   import { Tween } from "svelte/motion";
   import { cubicOut } from "svelte/easing";
   import Card from "../lib/components/Card.svelte";
@@ -10,6 +11,25 @@
   import { app } from "../lib/state.svelte";
 
   const dl = $derived(app.draft!.downloads); // derived: a save replaces app.draft
+  const subs = $derived(app.draft!.subtitles);
+  const AHEAD = [0, 1, 2, 3, 5] as const;
+  const downloadOptions = [
+    ...AHEAD.map((n) => ({ value: n as number | "season", label: n === 0 ? "Off" : `${n}` })),
+    { value: "season" as const, label: "Whole season" },
+  ];
+  // Subtitles need the audio, so never more episodes than are downloaded.
+  const subtitleOptions = $derived(
+    [0, 1, 2, 3, 5].map((n) => ({
+      value: n,
+      label: n === 0 ? "Off" : `${n}`,
+      disabled: dl.next_episodes !== "season" && n > dl.next_episodes,
+    })),
+  );
+  $effect(() => {
+    if (dl.next_episodes !== "season" && subs.next_episodes > dl.next_episodes) {
+      subs.next_episodes = dl.next_episodes;
+    }
+  });
   const GB = 1024 ** 3;
   const free = $derived(app.status?.disk.free ?? 0);
   // Scale the picture so both the free space and the reserve fit, with some headroom.
@@ -28,9 +48,33 @@
 />
 
 <Card
+  title="Next episodes"
+  subtitle="While you watch an episode of a season pack, get the following ones ready, so playback and subtitles are instant when you get there."
+  icon={ListVideo}
+>
+  <div class="ahead">
+    <Field
+      label="Download in advance"
+      hint="Each one still has to leave the disk reserve free; the rest wait their turn."
+      tomlKey="downloads.next_episodes"
+    >
+      <Segmented options={downloadOptions} bind:value={dl.next_episodes} label="Episodes to download ahead" />
+    </Field>
+    <Field
+      label="Romanian subtitles in advance"
+      hint="Generated whole after the playing episode is covered, so the TV gets the complete track the moment the episode starts. At most as many as are downloaded."
+      tomlKey="subtitles.next_episodes"
+    >
+      <Segmented options={subtitleOptions} bind:value={subs.next_episodes} label="Episodes to subtitle ahead" />
+    </Field>
+  </div>
+</Card>
+
+<Card
   title="Disk reserve"
   subtitle="Prefetching the next episode stops before the disk drops below this, and the nightly cleanup frees space down to it."
   icon={HardDrive}
+  delay={60}
 >
   <div class="disk">
     <div class="bar">
@@ -65,6 +109,11 @@
 </Card>
 
 <style>
+  .ahead {
+    display: grid;
+    gap: 22px;
+  }
+
   .disk {
     margin-bottom: 22px;
   }
