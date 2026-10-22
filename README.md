@@ -8,7 +8,8 @@ Makes the **official Stremio app on a Samsung TV** play torrents better, using a
 |---|---|---|
 | **Smooth playback** | The Mac downloads the whole file, so pausing actually buffers and resume is instant. The TV's built-in server only keeps ~45 MB. | ✅ working |
 | **Next episode ready** | Starting an episode of a season pack starts downloading the next one. | ✅ working |
-| **Romanian (AI) subtitles** | Generated from the audio (Whisper on the Mac → Claude Haiku), starting where you are in the video; the **next episode is generated in full while you watch**, so it works the moment it starts; stored forever, so a resume or rewatch is instant. | ✅ working |
+| **One "Stremio++" source, first in the list** | Asks every stream addon you have installed (Torrentio, ThePirateBay+, debrid addons…) and plays the best release: already on the Mac > same release as the last episode > plays on the TV > up to 4K > most seeders. Video untouched, original audio when the TV plays it (Dolby Digital Plus 5.1/Atmos included), DTS/TrueHD → Dolby Digital 5.1. | ✅ working |
+| **Romanian (AI) subtitles** | Generated from the audio (Whisper on the Mac → Claude Haiku), starting where you are in the video. On the Stremio++ source they're **inside the stream**: pick *Romanian (AI)* in the subtitles menu once and they show at once and keep coming, no toggling. On any other source they're an ordinary track (the TV loads it once; the next episode is generated in full ahead). Stored forever, so a resume or rewatch is instant. | ✅ working |
 | **Automatic cleanup** | Daily at 04:30: deletes torrents nobody played for 7 days; keeps ≥ 3 GiB free. | ✅ working |
 | Zero-click subtitles, synced human RO subs | Track picked automatically; existing human subtitles re-timed to the audio. | planned ([docs/plan.md](docs/plan.md)) |
 
@@ -27,6 +28,8 @@ Mac (launchd agents, all from this repo)
   │     cache kept until the companion deletes it; "ultra fast" torrent profile
   ├─ companion                  Python / FastAPI                :11471 http (LAN) · :8443 https (addon)
   │     ├─ watches the server log → which file the TV plays, where it seeks
+  │     ├─ stream: the "Stremio++" source: best release from your addons, repackaged as HLS
+  │     │   (ffmpeg, video copied) with the subtitle track inside, switched from the menu
   │     ├─ downloads: keeps the playing file + next episode downloading
   │     └─ subtitles: audio → Whisper (MLX) → Claude Haiku (`claude` CLI, your plan) → SRT, stored in SQLite
   ├─ cleanup (daily 04:30)      torrents unplayed for 7 days; LRU when disk < 3 GiB
@@ -38,8 +41,10 @@ Why it's built this way, with evidence from the server.js bundle: [docs/research
 ## Watching
 
 1. Play anything on the TV as usual.
-2. For Romanian subtitles: subtitles menu → **Romanian (AI)**. Generation starts when the episode loads; the first 15 s of lines (from just ahead of where you are) are ready ~10 s later on a well-seeded torrent. The TV loads the track once per selection, and Stremio auto-selects Romanian if you chose it last time, often before anything is ready. If you see *"Se generează subtitrarea…"*, or the lines run out, switch subtitles **off and back on to Romanian (AI)**: each load gets everything generated so far (re-selecting the active track does nothing). The next episode of a season pack is generated in full while you watch the current one, so when it starts the track is complete and needs no toggle; only the first episode you play of a new show needs one. On a resume or rewatch they're there immediately.
-3. Pause as long as you like; the download continues.
+2. Pick the **Stremio++** source (first in the list). Subtitles are whatever Stremio picks, as usual (real Romanian subtitles from OpenSubtitles when they exist: nothing is generated for nothing).
+3. For AI subtitles: subtitles menu → **Romanian (AI)**. They appear at once and keep coming inside the stream; Stremio remembers the choice for the next episode. Picking another track in the menu turns ours off (lines already buffered, ~10–30 s, still show). Stremio's own **Off** can't be seen by the addon: pick another track instead. How it works: [docs/design/hls-stream.md](docs/design/hls-stream.md).
+   On another source, *Romanian (AI)* is an ordinary track the TV loads once: if the lines run out, switch it off and on again. The next episode is generated in full ahead, so it needs no toggle.
+4. Pause as long as you like; the download continues.
 
 If the Mac is asleep or off, torrents won't play. Switch the TV back to its own server: [revert](docs/runbooks/tv-setup.md#4-revert).
 
@@ -89,7 +94,9 @@ Then point the TV at it and install the addon: [docs/runbooks/tv-setup.md](docs/
 |---|---|
 | TV says the server is **offline** | `mise run host:doctor`. Is the URL on the TV the **https** one it prints? Did the Mac's IP change (then `server:configure` and re-enter the URL)? |
 | No **Romanian (AI)** track | Is the **Stremio++** addon installed (desktop app → Addons, URL from `mise run addon:url`)? `mise run host:doctor` checks the certificate and that the addon answers over HTTPS. `companion.log` should show a `subtitles` request when a title opens. |
-| Track shows only *"Se generează…"* | Switch subtitles **off and back on to Romanian (AI)** (re-selecting the active track does nothing). `companion.log` shows `subtitle_window` lines as windows are generated. |
+| No **Stremio++** source | Is the addon installed and first (`stream_picked` in `companion.log` shows what it found)? `addon_streams_failed` names an addon that didn't answer. |
+| Stremio++ source won't play | `stream_unsupported` (AV1 / unusual codecs) or `stream_segment_unavailable` (torrent too slow) in `companion.log`; pick another source. |
+| Track shows only *"Se generează…"* (another source) | Switch subtitles **off and back on to Romanian (AI)** (re-selecting the active track does nothing). `companion.log` shows `subtitle_window` lines as windows are generated. |
 | Subtitles stopped mid-film | The TV loaded them up to the point of your last selection; switch subtitles off and back on to Romanian (AI). `companion.log` `srt_served` shows what each load got. |
 | Disk filling up | `mise run cleanup -- --dry-run`; the cleanup keeps ≥ 3 GiB free automatically. |
 

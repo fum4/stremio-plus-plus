@@ -15,6 +15,9 @@ MAX_WINDOW_S = 120.0
 # server: 8 s delay → 200, 11 s → 500 at 10.2 s (docs/research/stremio-internals.md).
 FIRST_ANSWER_WAIT_S = 7.0
 OVERLAP_S = 2.0
+# Until the viewer picks our track, only this much ahead of the playhead is generated: picking
+# it then shows lines at once, and an episode watched with other subtitles costs a few windows.
+PRIME_S = 120.0
 WHISPER_MODEL = "mlx-community/whisper-large-v3-turbo"
 TRANSLATE_MODEL = "claude-haiku-5-5"
 MAX_LINE_CHARS = 42

@@ -79,6 +79,7 @@ async def test_resume_mid_file_starts_ahead_of_the_playhead_then_covers_everythi
     stt = FakeStt()
     jobs, store = _jobs(tmp_path, stt)
     jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
+    jobs.want(IH, 2)
     # The TV's resume read lands before the file is even probed (the usual order on a resume).
     await jobs(FileRequested(IH, 2, LENGTH // 2))  # 50 % of 600 s → 300 s
     runner = asyncio.create_task(jobs.run())
@@ -97,6 +98,7 @@ async def test_tail_reads_do_not_move_the_playhead(tmp_path: Path) -> None:
     stt = FakeStt()
     jobs, store = _jobs(tmp_path, stt)
     jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
+    jobs.want(IH, 2)
     await jobs(FileRequested(IH, 2, LENGTH - 10))  # MKV index fetch at the end
     runner = asyncio.create_task(jobs.run())
     await _until(lambda: bool(store.spans(IH, 2)))
@@ -110,10 +112,12 @@ async def test_same_video_from_another_torrent_is_reused_without_generation(tmp_
     stt = FakeStt()
     jobs, store = _jobs(tmp_path, stt)
     jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
+    jobs.want(IH, 2)
     runner = asyncio.create_task(jobs.run())
     await _until(lambda: _complete(store))
     calls = len(stt.offsets)
     jobs.ensure("bb" * 20, 0, "Show.S01E03.other.mkv", LENGTH)
+    jobs.want("bb" * 20, 0)
     await _until(lambda: _complete(store, "bb" * 20, 0))
     runner.cancel()
     assert len(stt.offsets) == calls
@@ -144,14 +148,17 @@ async def test_a_failed_probe_is_retried_when_the_track_is_selected_again(
     jobs = SubtitleJobs(server, store, FakeStt(), FakeTranslator(), clock=lambda: now[0])
     runner = asyncio.create_task(jobs.run())
     jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
+    jobs.want(IH, 2)
     await _until(lambda: len(probes) == 1)
     await asyncio.sleep(0.05)
     now[0] += 10  # re-selected right away: still cooling down, no hammering
     jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
+    jobs.want(IH, 2)
     await asyncio.sleep(0.05)
     assert len(probes) == 1
     now[0] += 60  # re-selected a minute later: retried and generated
     jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
+    jobs.want(IH, 2)
     await _until(lambda: _complete(store))
     runner.cancel()
     assert len(probes) == 2
@@ -175,6 +182,7 @@ async def test_the_first_window_is_served_while_the_rest_is_still_downloading(
     monkeypatch.setattr(audio, "read_chunk", read_chunk)
     jobs, store = _jobs(tmp_path, FakeStt())
     jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
+    jobs.want(IH, 2)
     runner = asyncio.create_task(jobs.run())
     await _until(lambda: bool(jobs.cues(IH, 2)))
     assert store.spans(IH, 2) == [(12.5, 27.5)]
@@ -201,6 +209,7 @@ async def test_the_next_window_is_transcribed_while_the_previous_is_translated(
     store = SubtitleStore(open_db(tmp_path / "s.db"))
     jobs = SubtitleJobs(server, store, stt, WaitsForNextTranscription())
     jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
+    jobs.want(IH, 2)
     runner = asyncio.create_task(jobs.run())
     await _until(lambda: len(store.spans(IH, 2)) >= 1)
     runner.cancel()
@@ -223,6 +232,7 @@ async def test_the_next_episode_is_generated_whole_after_the_playing_one(
     monkeypatch.setattr(store, "save_span", recording)
     jobs.prepare_next(IH, 2, 3, "Show.S01E04.mkv", LENGTH)  # E03 has no subtitle job: ignored
     jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
+    jobs.want(IH, 2)
     jobs.prepare_next(IH, 2, 3, "Show.S01E04.mkv", LENGTH)
     runner = asyncio.create_task(jobs.run())
     await _until(lambda: _complete(store, IH, 3))
@@ -230,3 +240,19 @@ async def test_the_next_episode_is_generated_whole_after_the_playing_one(
     order = [i for i, _ in saved]
     assert order == sorted(order)  # every E03 window before any E04 one
     assert next(start for i, start in saved if i == 3) == 0.0  # E04 from 0:00, not aimed ahead
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("fake_audio")
+async def test_until_the_track_is_picked_only_the_start_is_generated(tmp_path: Path) -> None:
+    stt = FakeStt()
+    jobs, store = _jobs(tmp_path, stt)
+    jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
+    runner = asyncio.create_task(jobs.run())
+    await _until(lambda: bool(store.spans(IH, 2)) and not jobs._jobs[(IH, 2)].in_flight)  # pyright: ignore[reportPrivateUsage]
+    await asyncio.sleep(0.05)
+    assert max(end for _, end in store.spans(IH, 2)) <= 120.0 + 120.0  # PRIME_S + one window
+    assert not _complete(store)
+    jobs.want(IH, 2)
+    await _until(lambda: _complete(store))
+    runner.cancel()

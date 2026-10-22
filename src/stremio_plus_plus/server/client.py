@@ -8,7 +8,10 @@ import httpx
 from stremio_plus_plus.server.constants import (
     CACHE_SUBDIR,
     COMPANION_TAG,
+    CREATE_TIMEOUT_S,
     OPENSUB_HASH_TIMEOUT_S,
+    PEERS_MAX,
+    PEERS_MIN,
     REQUEST_TIMEOUT_S,
 )
 from stremio_plus_plus.server.models import Engine, TorrentFile
@@ -61,16 +64,28 @@ class StremioServer:
         values = cast(dict[str, Any], resp.json()["values"])
         return Path(str(values["cacheRoot"])) / CACHE_SUBDIR
 
-    async def opensub_hash(self, info_hash: str, file_index: int) -> str | None:
+    async def opensub_hash(self, video_url: str) -> str | None:
         """OpenSubtitles hash computed by the server from the file (never trust a client's)."""
         resp = await self._http.get(
             f"{self._base}/opensubHash",
-            params={"videoUrl": self.file_url(info_hash, file_index)},
+            params={"videoUrl": video_url},
             timeout=OPENSUB_HASH_TIMEOUT_S,
         )
         resp.raise_for_status()
         result = cast(dict[str, Any] | None, resp.json().get("result"))
         return str(result["hash"]) if result and result.get("hash") else None
+
+    async def create(self, info_hash: str, trackers: tuple[str, ...] = ()) -> Engine:
+        """Start (or join) the torrent the way Stremio clients do, with the addon's trackers."""
+        body: dict[str, Any] = {"torrent": {"infoHash": info_hash}}
+        if trackers:
+            sources = [*trackers, f"dht:{info_hash}"]
+            body["peerSearch"] = {"sources": sources, "min": PEERS_MIN, "max": PEERS_MAX}
+        resp = await self._http.post(
+            f"{self._base}/{info_hash}/create", json=body, timeout=CREATE_TIMEOUT_S
+        )
+        resp.raise_for_status()
+        return _parse_engine(info_hash, cast(dict[str, Any], resp.json()))
 
     async def remove(self, info_hash: str) -> None:
         resp = await self._http.get(f"{self._base}/{info_hash}/remove", timeout=REQUEST_TIMEOUT_S)

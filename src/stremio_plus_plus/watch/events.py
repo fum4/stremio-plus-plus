@@ -7,12 +7,14 @@ against server.js v4.22.4, docs/research/stremio-internals.md).
 
 import re
 from dataclasses import dataclass
+from urllib.parse import unquote
 
 from stremio_plus_plus.server.constants import COMPANION_TAG
 
 _FILE_REQUEST = re.compile(
     r"^-> GET /(?P<ih>[0-9a-f]{40})/(?P<idx>\d+)(?P<query>\?\S*)?(?: bytes=(?P<start>\d+)-\d*)?\s*$"
 )
+_SUBTITLE_FETCH = re.compile(r"^-> GET /subtitles\.\w+\?(?:\S*&)?from=(?P<src>[^&\s]+)")
 _ENGINE_CREATED = re.compile(r"^Engine created for (?P<ih>[0-9a-f]{40})")
 _ENGINE_DESTROYED = re.compile(r"^Engine (?P<ih>[0-9a-f]{40}) destroyed")
 
@@ -36,7 +38,14 @@ class EngineDestroyed:
     info_hash: str
 
 
-Event = FileRequested | EngineCreated | EngineDestroyed
+@dataclass(frozen=True)
+class SubtitleFetched:
+    """The player loaded an external subtitle track (any addon's) through the server."""
+
+    source_url: str
+
+
+Event = FileRequested | EngineCreated | EngineDestroyed | SubtitleFetched
 
 
 def parse_line(line: str) -> Event | None:
@@ -45,6 +54,8 @@ def parse_line(line: str) -> Event | None:
         if COMPANION_TAG in (m["query"] or ""):
             return None
         return FileRequested(m["ih"], int(m["idx"]), int(m["start"] or 0))
+    if m := _SUBTITLE_FETCH.match(line):
+        return SubtitleFetched(unquote(m["src"]))
     if m := _ENGINE_CREATED.match(line):
         return EngineCreated(m["ih"])
     if m := _ENGINE_DESTROYED.match(line):

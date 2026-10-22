@@ -15,28 +15,30 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 
 from stremio_plus_plus.app.services import Services
+from stremio_plus_plus.app.subtitle_switch import switch_on
 from stremio_plus_plus.subtitles.constants import FIRST_ANSWER_WAIT_S, LABEL, LANG
 from stremio_plus_plus.subtitles.cues import Cue, render_srt
 
 
-def _require_token(request: Request, token: str) -> None:
-    if not secrets.compare_digest(token, _services(request).env.addon_token):
+def require_token(request: Request, token: str) -> None:
+    if not secrets.compare_digest(token, services_of(request).env.addon_token):
         raise HTTPException(status_code=404)
 
 
 log = structlog.get_logger()
-addon_router = APIRouter(prefix="/{token}", dependencies=[Depends(_require_token)])
+HLS_START_WAIT_S = 5.0
+addon_router = APIRouter(prefix="/{token}", dependencies=[Depends(require_token)])
 lan_router = APIRouter()
 
 MANIFEST: dict[str, Any] = {
     "id": "io.github.fum4.stremio-plus-plus",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "name": "Stremio++",
     "description": (
-        "Extras for the Stremio TV app, served from your Mac. "
-        "Today: AI-generated Romanian subtitles (Whisper + Claude)."
+        "Extras for the Stremio TV app, served from your Mac: the best release from your "
+        "addons in one entry, with AI-generated Romanian subtitles (Whisper + Claude)."
     ),
-    "resources": ["subtitles"],
+    "resources": ["stream", "subtitles"],
     "types": ["movie", "series"],
     "idPrefixes": ["tt", "kitsu"],
     "catalogs": [],
@@ -49,7 +51,7 @@ PLACEHOLDER = [
 ]
 
 
-def _services(request: Request) -> Services:
+def services_of(request: Request) -> Services:
     return request.app.state.services
 
 
@@ -60,30 +62,46 @@ async def manifest() -> dict[str, Any]:
 
 @addon_router.get("/subtitles/{kind}/{item_id}/{extra}.json")
 async def subtitles(request: Request, kind: str, item_id: str, extra: str) -> dict[str, Any]:
-    services = _services(request)
+    services = services_of(request)
     params = {k: v[0] for k, v in parse_qs(extra).items()}
     filename, size = params.get("filename", ""), int(params.get("videoSize") or 0)
     for engine in (await services.server.engines()).values():
         for f in engine.files:
             if (filename and f.name.rsplit("/", 1)[-1] == filename) or (size and f.length == size):
                 services.subtitles.ensure(engine.info_hash, f.index, f.name, f.length)
-                base = f"http://{services.env.host_lan_ip}:{services.env.companion_port}"
-                return {
-                    "subtitles": [
-                        {
-                            "id": f"companion-ro-{engine.info_hash[:8]}-{f.index}",
-                            "lang": LANG,
-                            "label": LABEL,
-                            "url": f"{base}/srt/{engine.info_hash}/{f.index}.srt",
-                        }
-                    ]
-                }
+                return {"subtitles": [_entry(services, engine.info_hash, f.index)]}
+    if (offer := services.picker.offered_for(item_id)) is not None:
+        # Our own HLS entry (Stremio sends no file details for it): the menu entry is the
+        # switch for the subtitles inside the stream (subtitle_switch.py).
+        return {"subtitles": [_entry(services, *offer.file)]}
     return {"subtitles": []}
+
+
+def _entry(services: Services, info_hash: str, file_index: int) -> dict[str, str]:
+    base = f"http://{services.env.host_lan_ip}:{services.env.companion_port}"
+    return {
+        "id": f"companion-ro-{info_hash[:8]}-{file_index}",
+        "lang": LANG,
+        "label": LABEL,
+        "url": f"{base}/srt/{info_hash}/{file_index}.srt",
+    }
 
 
 @lan_router.get("/srt/{info_hash}/{file_index}.srt", response_class=PlainTextResponse)
 async def srt(request: Request, info_hash: str, file_index: int) -> PlainTextResponse:
-    jobs = _services(request).subtitles
+    services = services_of(request)
+    jobs = services.subtitles
+    jobs.want(info_hash, file_index)
+    session = services.sessions.playing(info_hash, file_index)
+    waited_for_stream = 0.0
+    while session is None and services.picker.offered_file(info_hash, file_index):
+        if waited_for_stream >= HLS_START_WAIT_S:  # the viewer picked another release of it
+            break
+        await asyncio.sleep(0.5)  # remembered track fetched as our stream is still opening
+        waited_for_stream += 0.5
+        session = services.sessions.playing(info_hash, file_index)
+    if session is not None:
+        return await switch_on(services, session)
     cues = jobs.cues(info_hash, file_index)
     waited = 0.0
     # The player fetches this once per track selection (and auto-selects a remembered language
