@@ -19,6 +19,8 @@ from stremio_plus_plus.app.subtitle_switch import switch_on
 from stremio_plus_plus.subtitles.constants import FIRST_ANSWER_WAIT_S, LABEL, LANG
 from stremio_plus_plus.subtitles.cues import Cue, render_srt
 
+log = structlog.get_logger()
+
 
 def require_token(request: Request, token: str) -> None:
     if not secrets.compare_digest(token, services_of(request).host.addon_token):
@@ -65,15 +67,32 @@ async def subtitles(request: Request, kind: str, item_id: str, extra: str) -> di
     services = services_of(request)
     params = {k: v[0] for k, v in parse_qs(extra).items()}
     filename, size = params.get("filename", ""), int(params.get("videoSize") or 0)
+    seen = {
+        "kind": kind,
+        "item": item_id,
+        "file": filename,
+        "client": request.client.host if request.client else None,
+        "agent": request.headers.get("user-agent", "")[:120],
+    }
     for engine in (await services.server.engines()).values():
         for f in engine.files:
             if (filename and f.name.rsplit("/", 1)[-1] == filename) or (size and f.length == size):
+                # What the TV opened, with its catalog id: the activity feed names it from this.
+                log.info(
+                    "addon_subtitles_request",
+                    **seen,
+                    info_hash=engine.info_hash,
+                    file_index=f.index,
+                )
                 services.subtitles.ensure(engine.info_hash, f.index, f.name, f.length)
                 return {"subtitles": [_entry(services, engine.info_hash, f.index)]}
     if (offer := services.picker.offered_for(item_id)) is not None:
+        ih, index = offer.file
+        log.info("addon_subtitles_request", **seen, info_hash=ih, file_index=index)
         # Our own HLS entry (Stremio sends no file details for it): the menu entry is the
         # switch for the subtitles inside the stream (subtitle_switch.py).
         return {"subtitles": [_entry(services, *offer.file)]}
+    log.info("addon_subtitles_request", **seen, info_hash=None, file_index=None)
     return {"subtitles": []}
 
 

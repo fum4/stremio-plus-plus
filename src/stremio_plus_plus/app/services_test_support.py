@@ -15,6 +15,7 @@ from stremio_plus_plus.config.settings_file import SettingsFile
 from stremio_plus_plus.downloads.manager import DownloadManager
 from stremio_plus_plus.downloads.pins import Pinner
 from stremio_plus_plus.server.client import StremioServer
+from stremio_plus_plus.state.activity import ActivityStore
 from stremio_plus_plus.state.db import open_db
 from stremio_plus_plus.state.plays import Plays
 from stremio_plus_plus.stream.sessions import Sessions
@@ -40,6 +41,7 @@ def make_services(tmp_path: Path, handler: Callable[[httpx.Request], httpx.Respo
     env = Env(
         stremio_server_url=AnyHttpUrl("http://srv:11470"),
         stremio_server_log=tmp_path / "server.log",
+        companion_log=tmp_path / "companion.log",
         companion_host="0.0.0.0",
         companion_port=11471,
         companion_data_dir=tmp_path,
@@ -83,5 +85,6 @@ def make_services(tmp_path: Path, handler: Callable[[httpx.Request], httpx.Respo
         playback_handlers=[],
         model_download=ModelDownload(),
         clients=ClientMonitor(tmp_path),
+        activity=ActivityStore(db),
         tv=TvService(env, settings_file),
     )

@@ -1,9 +1,11 @@
 """Turn the server log into playback events and fan them out to the feature handlers."""
 
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 
 import structlog
 
+from stremio_plus_plus.log.hub import HUB
 from stremio_plus_plus.watch.events import Event, parse_line
 
 Handler = Callable[[Event], Awaitable[None]]
@@ -12,6 +14,7 @@ log = structlog.get_logger()
 
 async def run_tracker(lines: AsyncIterator[str], handlers: Sequence[Handler]) -> None:
     async for line in lines:
+        HUB.server_line(line, time.time())  # the UI's raw log view, stamped on arrival
         event = parse_line(line)
         if event is None:
             continue

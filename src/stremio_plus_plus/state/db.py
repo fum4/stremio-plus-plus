@@ -56,6 +56,22 @@ MIGRATIONS: tuple[str, ...] = (
                cues_json, created_at
         FROM subtitle_chunks;
     """,
+    """
+    CREATE TABLE activity (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts            REAL    NOT NULL,
+        updated       REAL    NOT NULL,
+        category      TEXT    NOT NULL,
+        kind          TEXT    NOT NULL,
+        title         TEXT    NOT NULL,
+        detail        TEXT,
+        image         TEXT,
+        coalesce_key  TEXT,
+        count         INTEGER NOT NULL DEFAULT 1
+    );
+    CREATE INDEX activity_by_updated ON activity (updated);
+    CREATE INDEX activity_by_key ON activity (coalesce_key, updated);
+    """,
 )
 
 

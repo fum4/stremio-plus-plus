@@ -148,3 +148,27 @@ export interface TvState {
   can_drive: boolean;
   client_last_seen: number | null;
 }
+
+export type ActivityCategory = "playback" | "subtitles" | "downloads" | "system" | "problem";
+
+export interface ActivityItem {
+  id: number;
+  ts: number;
+  updated: number;
+  category: ActivityCategory;
+  kind: string;
+  title: string;
+  detail: string | null;
+  image: string | null;
+  count: number;
+}
+
+export interface LogEntry {
+  seq: number;
+  ts: number | null;
+  source: "server" | "companion";
+  level: string;
+  text: string;
+  event: string | null;
+  fields: Record<string, unknown>;
+}

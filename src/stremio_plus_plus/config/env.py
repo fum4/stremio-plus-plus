@@ -25,6 +25,7 @@ class Env(BaseSettings):
 
     stremio_server_url: AnyHttpUrl
     stremio_server_log: Path
+    companion_log: Path  # its own stdout file (launchd), read back for the UI's log view
     companion_host: str = Field(min_length=1)
     companion_port: int = Field(ge=1, le=65535)
     companion_data_dir: Path
@@ -60,6 +61,7 @@ class Env(BaseSettings):
 
     @field_validator(
         "stremio_server_log",
+        "companion_log",
         "stremio_server_data_dir",
         "companion_data_dir",
         "config_dir",

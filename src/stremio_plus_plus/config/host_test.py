@@ -12,6 +12,7 @@ def _env(tmp_path: Path, **values: object) -> Env:
     base: dict[str, object] = {
         "stremio_server_url": "http://127.0.0.1:11470",
         "stremio_server_log": tmp_path / "server.log",
+        "companion_log": tmp_path / "companion.log",
         "stremio_server_data_dir": tmp_path / "server",
         "stremio_server_settings": tmp_path / "settings.json",
         "companion_host": "0.0.0.0",

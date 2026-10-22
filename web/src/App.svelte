@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { fade, fly } from "svelte/transition";
-  import { CircleAlert, Gauge, HardDriveDownload, Link2, ListChecks, Subtitles } from "@lucide/svelte";
+  import { Activity as ActivityIcon, CircleAlert, Gauge, HardDriveDownload, Link2, ListChecks, Subtitles } from "@lucide/svelte";
   import Sidebar, { type NavItem } from "./lib/components/Sidebar.svelte";
   import SaveBar from "./lib/components/SaveBar.svelte";
   import Toasts from "./lib/components/Toasts.svelte";
@@ -11,9 +11,11 @@
   import Downloads from "./pages/Downloads.svelte";
   import Install from "./pages/Install.svelte";
   import Setup from "./pages/Setup.svelte";
+  import Activity from "./pages/Activity.svelte";
 
   const pages = {
     overview: { label: "Overview", icon: Gauge, component: Overview },
+    activity: { label: "Activity", icon: ActivityIcon, component: Activity },
     subtitles: { label: "Subtitles", icon: Subtitles, component: SubtitlesPage },
     downloads: { label: "Downloads", icon: HardDriveDownload, component: Downloads },
     install: { label: "Install", icon: Link2, component: Install },

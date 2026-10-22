@@ -36,21 +36,21 @@ class Pinner:
         log.info("pinned", info_hash=info_hash, file_index=file_index)
         return True
 
-    async def release(self, info_hash: str, file_index: int) -> None:
+    async def release(self, info_hash: str, file_index: int, reason: str = "complete") -> None:
         task = self._tasks.pop((info_hash, file_index), None)
         if task:
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
-            log.info("released", info_hash=info_hash, file_index=file_index)
+            log.info("released", info_hash=info_hash, file_index=file_index, reason=reason)
 
     async def release_engine(self, info_hash: str) -> None:
         for ih, idx in [k for k in self._tasks if k[0] == info_hash]:
-            await self.release(ih, idx)
+            await self.release(ih, idx, "torrent closed")
 
     async def close(self) -> None:
         for ih, idx in list(self._tasks):
-            await self.release(ih, idx)
+            await self.release(ih, idx, "shutdown")
 
     async def _hold(self, key: FileKey) -> None:
         url = self._server.file_url(*key)
