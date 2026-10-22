@@ -109,6 +109,40 @@ def companion_line(event: str, f: dict[str, Any], level: str) -> Line | None:
                 key=f"srt:{f.get('info_hash')}:{f.get('file_index')}",
                 within_s=300,
             )
+        case "stremio_account_connected":
+            return Line("system", "account", "Stremio account connected")
+        case "stremio_account_disconnected":
+            return Line("system", "account", "Stremio account disconnected")
+        case "stremio_addon_installed":
+            return Line(
+                "system",
+                "addon",
+                "Stremio++ installed in your Stremio account",
+                "first in the list",
+            )
+        case "stremio_addon_kept_first":
+            detail = (
+                "its address changed too"
+                if f.get("repointed")
+                else f"it was number {int(str(f.get('was_at') or 0)) + 1}"
+            )
+            return Line(
+                "system",
+                "addon",
+                "Moved Stremio++ back to the top of your addons",
+                detail,
+                key="kept_first",
+                within_s=3600,
+            )
+        case "stremio_addon_keep_failed":
+            return Line(
+                "problem",
+                "addon",
+                "Couldn't check the addon order in your Stremio account",
+                str(f.get("error")),
+                key="keep_failed",
+                within_s=3600,
+            )
         case "settings_reloaded":
             return Line("system", "settings", "Settings changed", "config.toml was edited")
         case "settings_invalid_keeping_last_good":

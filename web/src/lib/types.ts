@@ -19,6 +19,7 @@ export interface SpeechSettings {
 
 export interface Settings {
   subtitles: { translator: TranslatorSettings; speech: SpeechSettings; next_episodes: number };
+  stremio: { keep_addon_first: boolean };
   downloads: {
     min_free_gb: number;
     stale_after_days: number;
@@ -109,6 +110,8 @@ export interface SetupCheck {
     | "translator"
     | "model"
     | "tv_connected"
+    | "account"
+    | "addon_installed"
     | "disk";
   label: string;
   level: CheckLevel;
@@ -175,4 +178,15 @@ export interface LogEntry {
   text: string;
   event: string | null;
   fields: Record<string, unknown>;
+}
+
+export interface AccountState {
+  connected: boolean;
+  email: string | null;
+  error: string | null;
+  position: number | null; // of Stremio++ in the collection; null = not installed
+  url_current: boolean;
+  addons: { id: string | null; name: string; ours: boolean }[];
+  keep_first: boolean;
+  manifest_url: string | null;
 }

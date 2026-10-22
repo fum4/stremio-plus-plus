@@ -70,10 +70,17 @@ class TvSettings(_Section):
     os: TvOs | None = None  # which tv/ adapter; only samsung is verified on hardware
 
 
+class StremioSettings(_Section):
+    """What stremio++ does with a connected Stremio account (account/)."""
+
+    keep_addon_first: bool = True  # Stremio lists streams in collection order
+
+
 class Settings(_Section):
     subtitles: SubtitleSettings = SubtitleSettings()
     downloads: DownloadSettings = DownloadSettings()
     tv: TvSettings = TvSettings()
+    stremio: StremioSettings = StremioSettings()
 
 
 class Secrets(_Section):

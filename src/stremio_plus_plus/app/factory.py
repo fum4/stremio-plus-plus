@@ -10,9 +10,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from stremio_plus_plus.app import admin, logs_api, setup, tv_api
+from stremio_plus_plus.account.api import StremioApi
+from stremio_plus_plus.account.credentials import AuthFile
+from stremio_plus_plus.account.service import StremioAccount
+from stremio_plus_plus.app import account_api, admin, logs_api, setup, tv_api
 from stremio_plus_plus.app.activity import ActivityFeed
-from stremio_plus_plus.app.addon import addon_router, lan_router
+from stremio_plus_plus.app.addon import MANIFEST, addon_router, lan_router
 from stremio_plus_plus.app.https_guard import HttpsGuard
 from stremio_plus_plus.app.picker import Picker
 from stremio_plus_plus.app.services import HostInfo, Services
@@ -74,6 +77,15 @@ def create_app(env: Env, settings_file: SettingsFile, host: HostInfo) -> FastAPI
             HUB.add_secret(host.addon_token)
             seed(HUB, env.stremio_server_log, env.companion_log)
             activity_store = ActivityStore(db)
+            account = StremioAccount(
+                StremioApi(http),
+                AuthFile(env.companion_data_dir),
+                str(MANIFEST["id"]),
+                MANIFEST,
+                lambda: host.manifest_url,
+                lambda: settings_file.settings.stremio.keep_addon_first,
+                HUB.add_secret,
+            )
             feed = ActivityFeed(activity_store, server, subtitle_store, Cinemeta(http))
             feed.attach(HUB)
             await feed.backfill(HUB)
@@ -105,13 +117,14 @@ def create_app(env: Env, settings_file: SettingsFile, host: HostInfo) -> FastAPI
                 downloads=downloads,
                 subtitle_store=subtitle_store,
                 subtitles=subtitles,
-                picker=Picker(http, server, env.companion_data_dir),
+                picker=Picker(http, server, account.collection),
                 sessions=sessions,
                 playback_handlers=handlers,
                 translator=translator,
                 model_download=ModelDownload(),
                 clients=clients,
                 activity=activity_store,
+                account=account,
                 tv=TvService(env, settings_file),
             )
             app.state.services = services
@@ -129,6 +142,7 @@ def create_app(env: Env, settings_file: SettingsFile, host: HostInfo) -> FastAPI
                 asyncio.create_task(sessions.run_reaper(), name="hls-reaper"),
                 asyncio.create_task(_watch_settings(settings_file), name="settings-watch"),
                 asyncio.create_task(feed.run(), name="activity"),
+                asyncio.create_task(account.run(), name="stremio-account"),
             ]
             log.info(
                 "companion_started", data_dir=str(env.companion_data_dir), cache_dir=str(cache_dir)
@@ -159,6 +173,7 @@ def create_app(env: Env, settings_file: SettingsFile, host: HostInfo) -> FastAPI
     app.include_router(setup.router)
     app.include_router(tv_api.router)
     app.include_router(logs_api.router)
+    app.include_router(account_api.router)
     app.add_middleware(HttpsGuard, https_port=env.addon_https_port, token=host.addon_token)
 
     @app.get("/health")
