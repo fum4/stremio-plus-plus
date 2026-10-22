@@ -130,6 +130,18 @@ class StremioAccount:
         ]
         return AccountState(True, email, None, at, current, summaries)
 
+    async def collection(self) -> list[Addon] | None:
+        """The installed addons for readers (the stream picker); None without an account or
+        when Stremio can't be read. Errors carry no key (StremioApiError, raised from None)."""
+        key = self.key
+        if key is None:
+            return None
+        try:
+            return await self._api.addons(key)
+        except StremioApiError as exc:
+            log.warning("addon_collection_unavailable", error=str(exc))
+            return None
+
     async def install(self) -> AccountState:
         """Add Stremio++ (or repoint it at this host's URL) and put it first."""
         key, url = self.key, self._manifest_url()

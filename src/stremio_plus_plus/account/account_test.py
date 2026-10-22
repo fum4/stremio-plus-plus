@@ -175,3 +175,17 @@ async def test_an_outage_is_not_a_sign_out(tmp_path: Path) -> None:
     )
     state = await account.state(fresh=True)
     assert state.connected and state.error and "unreachable" in state.error
+
+
+@pytest.mark.asyncio
+async def test_collection_for_readers_is_none_without_an_account_or_on_errors(
+    tmp_path: Path,
+) -> None:
+    fake = FakeStremio([_addon("torrentio")])
+    account = _account(tmp_path, fake)
+    assert await account.collection() is None
+    await account.use_key("good-key")
+    collection = await account.collection()
+    assert collection is not None and addon_id(collection[0]) == "torrentio"
+    fake.keys.clear()
+    assert await account.collection() is None

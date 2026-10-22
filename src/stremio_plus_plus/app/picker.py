@@ -2,10 +2,10 @@
 the player opens it (starting the torrent only then)."""
 
 import hashlib
-import json
 import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from pathlib import Path
+from typing import Any
 
 import httpx
 import structlog
@@ -18,7 +18,6 @@ from stremio_plus_plus.stream.session import Source
 
 log = structlog.get_logger()
 _TORRENT_KEY = re.compile(r"^([0-9a-f]{40})-(\d+)$")
-AUTH_FILE = "stremio-auth.json"  # written by the account setup; holds only {"authKey"}
 
 
 @dataclass(frozen=True)
@@ -51,22 +50,21 @@ def _show(item_id: str) -> str:
 
 
 class Picker:
-    def __init__(self, http: httpx.AsyncClient, server: StremioServer, data_dir: Path) -> None:
+    def __init__(
+        self,
+        http: httpx.AsyncClient,
+        server: StremioServer,
+        collection: Callable[[], Awaitable[list[dict[str, Any]] | None]],
+    ) -> None:
         self._http = http
         self._server = server
-        self._auth = data_dir / AUTH_FILE
+        self._collection = collection  # the account's addons (account/service.py), or None
         self._offers: dict[str, Offer] = {}
         self._by_item: dict[str, str] = {}
         self._last_group: dict[str, str] = {}  # show → bingeGroup of the release last played
 
-    def _auth_key(self) -> str | None:
-        try:
-            return str(json.loads(self._auth.read_text())["authKey"]) or None
-        except OSError, ValueError, KeyError, TypeError:
-            return None
-
     async def pick(self, kind: str, item_id: str) -> Offer | None:
-        addons = await stream_addons(self._http, self._auth_key(), kind, item_id)
+        addons = stream_addons(await self._collection(), kind, item_id)
         found = await candidates(self._http, addons, kind, item_id)
         local = dict.fromkeys(await self._server.engines(), 1.0)
         ranked = rank(found, local, self._last_group.get(_show(item_id)))

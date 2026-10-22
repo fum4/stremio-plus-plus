@@ -117,7 +117,7 @@ def create_app(env: Env, settings_file: SettingsFile, host: HostInfo) -> FastAPI
                 downloads=downloads,
                 subtitle_store=subtitle_store,
                 subtitles=subtitles,
-                picker=Picker(http, server, env.companion_data_dir),
+                picker=Picker(http, server, account.collection),
                 sessions=sessions,
                 playback_handlers=handlers,
                 translator=translator,

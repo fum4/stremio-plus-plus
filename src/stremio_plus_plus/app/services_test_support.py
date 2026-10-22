@@ -70,6 +70,15 @@ def make_services(tmp_path: Path, handler: Callable[[httpx.Request], httpx.Respo
     pinner = Pinner(http, server)
     settings_file = SettingsFile(env.config_dir)
     translator = ConfiguredTranslator(settings_file, env.claude_cli)
+    account = StremioAccount(
+        StremioApi(http, "https://api.test"),
+        AuthFile(tmp_path),
+        "io.github.fum4.stremio-plus-plus",
+        {"id": "io.github.fum4.stremio-plus-plus"},
+        lambda: None,
+        lambda: True,
+        HUB.add_secret,  # as in factory.py: the key is redacted from every log view
+    )
     return Services(
         env=env,
         host=HostInfo(IPv4Address("192.168.1.132"), TOKEN, 8443, tls=TLS),
@@ -84,20 +93,12 @@ def make_services(tmp_path: Path, handler: Callable[[httpx.Request], httpx.Respo
         subtitle_store=store,
         subtitles=SubtitleJobs(server, store, NoStt(), translator),
         translator=translator,
-        picker=Picker(http, server, tmp_path),
+        picker=Picker(http, server, account.collection),
         sessions=Sessions(tmp_path / "hls"),
         playback_handlers=[],
         model_download=ModelDownload(),
         clients=ClientMonitor(tmp_path),
         activity=ActivityStore(db),
-        account=StremioAccount(
-            StremioApi(http, "https://api.test"),
-            AuthFile(tmp_path),
-            "io.github.fum4.stremio-plus-plus",
-            {"id": "io.github.fum4.stremio-plus-plus"},
-            lambda: None,
-            lambda: True,
-            HUB.add_secret,  # as in factory.py: the key is redacted from every log view
-        ),
+        account=account,
         tv=TvService(env, settings_file),
     )

@@ -18,7 +18,6 @@ from stremio_plus_plus.sources.constants import (
 
 log = structlog.get_logger()
 HEADERS = {"User-Agent": USER_AGENT}
-COLLECTION_URL = "https://api.strem.io/api/addonCollectionGet"
 
 
 def _serves(manifest: dict[str, Any], kind: str, item_id: str) -> bool:
@@ -40,30 +39,17 @@ def _serves(manifest: dict[str, Any], kind: str, item_id: str) -> bool:
     return kind in types and (not prefixes or any(item_id.startswith(p) for p in prefixes))
 
 
-async def stream_addons(
-    http: httpx.AsyncClient, auth_key: str | None, kind: str, item_id: str
-) -> list[str]:
-    """Base URLs of the account's addons that serve streams for this item, in their order."""
-    if auth_key:
-        try:
-            resp = await http.post(
-                COLLECTION_URL,
-                json={"type": "AddonCollectionGet", "authKey": auth_key, "update": True},
-                headers=HEADERS,
-                timeout=FETCH_TIMEOUT_S,
-            )
-            addons = cast(list[dict[str, Any]], resp.json()["result"]["addons"])
-            bases = [
-                str(a["transportUrl"]).removesuffix("/manifest.json")
-                for a in addons
-                if _serves(cast(dict[str, Any], a.get("manifest") or {}), kind, item_id)
-                and str(a.get("transportUrl", "")).startswith("https://")
-            ]
-            if bases:
-                return bases
-        except httpx.HTTPError, KeyError, TypeError, ValueError:
-            log.warning("addon_collection_unavailable", exc_info=True)
-    return list(DEFAULT_ADDONS)
+def stream_addons(addons: list[dict[str, Any]] | None, kind: str, item_id: str) -> list[str]:
+    """Base URLs of the account's addons that serve streams for this item, in their order;
+    Stremio's defaults without an account (or when its collection couldn't be read).
+    The URLs can embed debrid keys: never log them."""
+    bases = [
+        str(a["transportUrl"]).removesuffix("/manifest.json")
+        for a in addons or []
+        if _serves(cast(dict[str, Any], a.get("manifest") or {}), kind, item_id)
+        and str(a.get("transportUrl", "")).startswith("https://")
+    ]
+    return bases or list(DEFAULT_ADDONS)
 
 
 async def _one(http: httpx.AsyncClient, base: str, kind: str, item_id: str) -> list[Candidate]:

@@ -83,6 +83,7 @@ Optional: a setup step ("Stremio account", skippable) and the **Stremio** page (
 - Groundwork for later: CORE reading the installed stream addons, and library/watch-progress prefetch.
 
 ## Next
+0. **Source selection (from CORE, constants today):** quality preference (`sources/constants.py MAX_HEIGHT`, 2160), `HEALTHY_SEEDERS` (25), `DEFAULT_ADDONS` (Torrentio, used without an account), `subtitles/constants.py PRIME_S` (120 s generated before the track is picked), subtitle language (`LANG`/`LABEL`, Romanian only). These go into `config.toml` and a "Sources" section once CORE's HLS stream settles.
 1. **Profiles + languages (decision 2):** `languages = [...]` per install URL, `behaviorHints.configurable` + `/configure` page; STT once per file, translation per language (store keyed by language, append-only migration); one prompt template per language.
 2. **`openai-compatible` backend** (covers local models), then benchmark candidates on Batman.
 3. **Server tuning in the file:** cache size (never 0) and the torrent profile from `infra/stremio-server/settings.json` move into `config.toml`, applied through `POST /settings`.
