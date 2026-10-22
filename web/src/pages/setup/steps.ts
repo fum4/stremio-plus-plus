@@ -16,7 +16,14 @@ export const STEPS: Step[] = [
   { id: "server", title: "Streaming server", blurb: "Reachable by your TV", checks: ["server_tv", "https"] },
   { id: "translator", title: "Translator", blurb: "The AI that writes the subtitles", checks: ["translator"] },
   { id: "model", title: "Speech model", blurb: "Whisper, downloaded once", checks: ["model"] },
-  { id: "tv", title: "Your TV", blurb: "Point Stremio at this Mac", checks: [], confirm: "The TV shows the server as online" },
+  {
+    id: "tv",
+    title: "Your TV",
+    blurb: "Point Stremio at this Mac",
+    checks: ["tv_connected"],
+    // Fallback when the TV's requests can't be seen yet (e.g. it connected before this update).
+    confirm: "The TV shows the server as online",
+  },
   { id: "addon", title: "The addon", blurb: "Add Stremio++ to your account", checks: [], confirm: "Stremio++ is installed in my account" },
 ];
 
@@ -40,8 +47,8 @@ export function stepChecks(state: SetupState, step: Step): SetupCheck[] {
 
 /** Done = nothing red; warnings count as done only for the machine step (e.g. low-ish disk). */
 export function stepDone(state: SetupState, step: Step, ticked: Set<StepId>): boolean {
-  if (step.confirm) return ticked.has(step.id);
   const checks = stepChecks(state, step);
+  if (step.confirm) return ticked.has(step.id) || (checks.length > 0 && checks.every((c) => c.level === "ok"));
   return step.id === "machine"
     ? checks.every((c) => c.level !== "bad")
     : checks.every((c) => c.level === "ok");

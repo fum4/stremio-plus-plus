@@ -15,6 +15,8 @@ _FILE_REQUEST = re.compile(
     r"^-> GET /(?P<ih>[0-9a-f]{40})/(?P<idx>\d+)(?P<query>\?\S*)?(?: bytes=(?P<start>\d+)-\d*)?\s*$"
 )
 _SUBTITLE_FETCH = re.compile(r"^-> GET /subtitles\.\w+\?(?:\S*&)?from=(?P<src>[^&\s]+)")
+# Any other request; untagged ones come from a Stremio app (the TV), never from the companion.
+_REQUEST = re.compile(r"^-> [A-Z]+ (?P<path>/\S*)")
 _ENGINE_CREATED = re.compile(r"^Engine created for (?P<ih>[0-9a-f]{40})")
 _ENGINE_DESTROYED = re.compile(r"^Engine (?P<ih>[0-9a-f]{40}) destroyed")
 
@@ -45,7 +47,14 @@ class SubtitleFetched:
     source_url: str
 
 
-Event = FileRequested | EngineCreated | EngineDestroyed | SubtitleFetched
+@dataclass(frozen=True)
+class ClientSeen:
+    """A Stremio app talked to the server (settings, stats…): it is pointed at this host."""
+
+    path: str
+
+
+Event = FileRequested | EngineCreated | EngineDestroyed | SubtitleFetched | ClientSeen
 
 
 def parse_line(line: str) -> Event | None:
@@ -60,4 +69,6 @@ def parse_line(line: str) -> Event | None:
         return EngineCreated(m["ih"])
     if m := _ENGINE_DESTROYED.match(line):
         return EngineDestroyed(m["ih"])
+    if (m := _REQUEST.match(line)) and COMPANION_TAG not in m["path"]:
+        return ClientSeen(m["path"].split("?", 1)[0])
     return None

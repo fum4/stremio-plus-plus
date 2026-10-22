@@ -14,9 +14,10 @@ from typing import Literal
 from pydantic import AnyHttpUrl, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from stremio_plus_plus.config.settings import TvOs
+
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 LogFormat = Literal["json", "console"]
-TvOs = Literal["samsung", "webos", "androidtv", "firetv"]
 
 
 class Env(BaseSettings):
@@ -37,7 +38,7 @@ class Env(BaseSettings):
     stremio_server_settings: Path
     # Unset: detected from the default route (config/host.py).
     host_lan_ip: IPv4Address | None = None
-    # A TV to control (tv/, `mise run tv`); the companion itself never needs one.
+    # A TV to control (tv/, `mise run tv`); wins over config.toml [tv]. Usually unset.
     tv_host: IPv4Address | None = None
     tv_os: TvOs | None = None  # which tv/ adapter; only samsung is verified on hardware
     claude_cli: Path

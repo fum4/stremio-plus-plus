@@ -1,6 +1,9 @@
-"""Pick the adapter for TV_OS. Only Samsung is verified on a real TV (see each module)."""
+"""Pick the adapter for the TV's OS. Only Samsung is verified on a real TV (see each module)."""
 
-from stremio_plus_plus.config.env import Env
+from ipaddress import IPv4Address
+from pathlib import Path
+
+from stremio_plus_plus.config.settings import TvOs
 from stremio_plus_plus.tv.androidtv import AndroidTvRemote
 from stremio_plus_plus.tv.base import TvControlError, TvRemote
 from stremio_plus_plus.tv.constants import (
@@ -15,11 +18,14 @@ from stremio_plus_plus.tv.samsung import SamsungRemote
 from stremio_plus_plus.tv.webos import WebOsRemote
 
 
-def make_remote(env: Env) -> TvRemote:
-    if env.tv_host is None or env.tv_os is None:
-        raise TvControlError("no TV configured: set TV_HOST and TV_OS in .env.local")
-    host, data = str(env.tv_host), env.companion_data_dir
-    match env.tv_os:
+def make_remote(target: tuple[IPv4Address, TvOs] | None, data: Path) -> TvRemote:
+    """`target` from config.host.tv_target; credentials live in the companion's data dir."""
+    if target is None:
+        raise TvControlError(
+            "no TV configured: run the setup's TV step, or set [tv] in config.toml"
+        )
+    host, os_ = str(target[0]), target[1]
+    match os_:
         case "samsung":
             return SamsungRemote(host, data / TOKEN_FILE)
         case "webos":

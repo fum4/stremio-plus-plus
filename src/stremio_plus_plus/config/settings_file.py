@@ -7,8 +7,9 @@ half-applied. Saves go through tomlkit so comments and key order survive, and ar
 
 import os
 import tomllib
+from ipaddress import IPv4Address
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import tomlkit
 from pydantic import ValidationError
@@ -37,6 +38,10 @@ source_language = "en"
 [downloads]
 min_free_gb = 3                # never let downloads push the disk below this
 stale_after_days = 7           # delete torrents nobody played for this long
+
+[tv]                           # optional: a TV this Mac can control; the setup finds and pairs it
+# host = "192.168.1.134"
+# os = "samsung"               # samsung | webos | androidtv | firetv
 """
 
 
@@ -133,7 +138,7 @@ class SettingsFile:
         a concurrent hand edit elsewhere survives), and write it only if the whole file is valid."""
         self.refresh()
         doc = _parse_doc(self.path)
-        _merge(doc, values)
+        _merge(doc, _plain(values))
         try:
             settings = Settings.model_validate(doc.unwrap())
         except ValidationError as exc:
@@ -165,6 +170,17 @@ class SettingsFile:
         except ValidationError as exc:  # key names only: the values are secrets
             keys = ", ".join(".".join(str(p) for p in e["loc"]) for e in exc.errors())
             raise SettingsError(f"{name}: invalid or unknown key(s): {keys}") from None
+
+
+def _plain(values: dict[str, Any]) -> dict[str, Any]:
+    """TOML has strings, not IP objects."""
+    out: dict[str, Any] = {}
+    for key, value in values.items():
+        if isinstance(value, dict):
+            out[key] = _plain(cast(dict[str, Any], value))
+        else:
+            out[key] = str(value) if isinstance(value, IPv4Address) else value
+    return out
 
 
 def _parse_doc(path: Path) -> tomlkit.TOMLDocument:

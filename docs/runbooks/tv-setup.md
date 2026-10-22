@@ -23,6 +23,9 @@ The TV's server URL contains the Mac's IP, so it must never change.
 ## 2. Start the services on the Mac
 `mise run host:promote` on a new Mac, or `mise run services:install`. `mise run host:doctor` must be all green; it prints the **TV server URL**.
 
+## Automation (setup wizard, Your TV step)
+The setup UI does §3 for you where it can: it finds the TV on the network (SSDP), pairs with it (the TV asks to **Allow**; Android TV shows a code), and **Type it for me** types the server URL into the focused field. The step ticks itself once the TV's first request reaches the server (untagged requests in `server.log`, `watch/clients.py`). **Set it up on my TV** (open Stremio → Settings → Streaming → Server URL by itself) needs a key sequence recorded on that TV model (`tv/macros.py`, `SET_SERVER_URL`); until then it isn't offered. The revert (§4) has the same **Type it for me**. The TV it controls is `config.toml` `[tv]` (`TV_HOST`/`TV_OS` in `.env.local` win).
+
 ## 3. Point the TV at the Mac (HTTPS only)
 The TV app **refuses plain http to anything but `127.0.0.1`**: `http://<mac-ip>:11470` shows "offline" and never reaches the Mac. The server's HTTPS mode solves it: `remoteHttps` = the LAN IP gives a public DNS name that resolves to the LAN IP, with a certificate issued by Stremio's API.
 1. Write down the current server URL on the TV (table above) if it isn't recorded yet.

@@ -37,12 +37,16 @@ class StremioServer:
         self._base = base_url.rstrip("/")
         self._http = http
 
+    def _url(self, path: str) -> str:
+        """Every request is tagged: an untagged one in the server log is a Stremio app (watch/)."""
+        return f"{self._base}{path}{'&' if '?' in path else '?'}{COMPANION_TAG}"
+
     def file_url(self, info_hash: str, file_index: int) -> str:
         """URL our own readers use; tagged so the watch tracker ignores it."""
         return f"{self._base}/{info_hash}/{file_index}?{COMPANION_TAG}"
 
     async def engines(self) -> dict[str, Engine]:
-        resp = await self._http.get(f"{self._base}/stats.json", timeout=REQUEST_TIMEOUT_S)
+        resp = await self._http.get(self._url("/stats.json"), timeout=REQUEST_TIMEOUT_S)
         resp.raise_for_status()
         data = cast(dict[str, dict[str, Any]], resp.json())
         return {ih: _parse_engine(ih, raw) for ih, raw in data.items()}
@@ -50,7 +54,7 @@ class StremioServer:
     async def file_progress(self, info_hash: str, file_index: int) -> float | None:
         """Fraction of the file's pieces on disk (`streamProgress`), None if the engine is gone."""
         resp = await self._http.get(
-            f"{self._base}/{info_hash}/{file_index}/stats.json", timeout=REQUEST_TIMEOUT_S
+            self._url(f"/{info_hash}/{file_index}/stats.json"), timeout=REQUEST_TIMEOUT_S
         )
         if resp.status_code != 200 or not resp.content.strip():
             return None
@@ -59,15 +63,13 @@ class StremioServer:
 
     async def settings(self) -> dict[str, Any]:
         """The server's current settings values (GET /settings)."""
-        resp = await self._http.get(f"{self._base}/settings", timeout=REQUEST_TIMEOUT_S)
+        resp = await self._http.get(self._url("/settings"), timeout=REQUEST_TIMEOUT_S)
         resp.raise_for_status()
         return cast(dict[str, Any], resp.json()["values"])
 
     async def update_settings(self, values: dict[str, Any]) -> None:
         """POST /settings merges into the server's settings and persists them."""
-        resp = await self._http.post(
-            f"{self._base}/settings", json=values, timeout=REQUEST_TIMEOUT_S
-        )
+        resp = await self._http.post(self._url("/settings"), json=values, timeout=REQUEST_TIMEOUT_S)
         resp.raise_for_status()
         if not cast(dict[str, Any], resp.json()).get("success"):
             raise RuntimeError(f"server refused the settings: {resp.text[:200]}")
@@ -75,13 +77,13 @@ class StremioServer:
     async def request_https(self, ip: str) -> None:
         """Have the server fetch (or renew) its stremio.rocks certificate for this LAN IP."""
         resp = await self._http.get(
-            f"{self._base}/get-https", params={"ipAddress": ip}, timeout=OPENSUB_HASH_TIMEOUT_S
+            self._url("/get-https"), params={"ipAddress": ip}, timeout=OPENSUB_HASH_TIMEOUT_S
         )
         resp.raise_for_status()
 
     async def cache_dir(self) -> Path:
         """`<cacheRoot>/stremio-cache`: one sub-directory per info hash (server.js getCachePath)."""
-        resp = await self._http.get(f"{self._base}/settings", timeout=REQUEST_TIMEOUT_S)
+        resp = await self._http.get(self._url("/settings"), timeout=REQUEST_TIMEOUT_S)
         resp.raise_for_status()
         values = cast(dict[str, Any], resp.json()["values"])
         return Path(str(values["cacheRoot"])) / CACHE_SUBDIR
@@ -89,7 +91,7 @@ class StremioServer:
     async def opensub_hash(self, video_url: str) -> str | None:
         """OpenSubtitles hash computed by the server from the file (never trust a client's)."""
         resp = await self._http.get(
-            f"{self._base}/opensubHash",
+            self._url("/opensubHash"),
             params={"videoUrl": video_url},
             timeout=OPENSUB_HASH_TIMEOUT_S,
         )
@@ -104,11 +106,11 @@ class StremioServer:
             sources = [*trackers, f"dht:{info_hash}"]
             body["peerSearch"] = {"sources": sources, "min": PEERS_MIN, "max": PEERS_MAX}
         resp = await self._http.post(
-            f"{self._base}/{info_hash}/create", json=body, timeout=CREATE_TIMEOUT_S
+            self._url(f"/{info_hash}/create"), json=body, timeout=CREATE_TIMEOUT_S
         )
         resp.raise_for_status()
         return _parse_engine(info_hash, cast(dict[str, Any], resp.json()))
 
     async def remove(self, info_hash: str) -> None:
-        resp = await self._http.get(f"{self._base}/{info_hash}/remove", timeout=REQUEST_TIMEOUT_S)
+        resp = await self._http.get(self._url(f"/{info_hash}/remove"), timeout=REQUEST_TIMEOUT_S)
         resp.raise_for_status()

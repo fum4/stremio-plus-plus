@@ -8,6 +8,8 @@ import argparse
 import asyncio
 
 from stremio_plus_plus.config.env import load_env
+from stremio_plus_plus.config.host import tv_target
+from stremio_plus_plus.config.settings_file import SettingsFile
 from stremio_plus_plus.tv.base import TvControlError
 from stremio_plus_plus.tv.factory import PAIR_HINT, make_remote
 from stremio_plus_plus.tv.keys import COMMON_KEYS
@@ -19,19 +21,20 @@ async def _ask_code() -> str:
 
 async def _run(args: argparse.Namespace) -> int:
     env = load_env()
+    target = tv_target(env, SettingsFile(env.config_dir).settings)
     try:
-        remote = make_remote(env)
+        remote = make_remote(target, env.companion_data_dir)
     except TvControlError as exc:
         print(exc)  # noqa: T201
         return 1
-    assert env.tv_os is not None  # make_remote checked it
-    tv = f"TV {env.tv_host} ({env.tv_os})"
+    assert target is not None  # make_remote checked it
+    tv = f"TV {target[0]} ({target[1]})"
     if args.cmd == "status":
         print(f"{tv}: {'paired' if remote.paired else 'not paired'}")  # noqa: T201  (CLI output)
         return 0 if remote.paired else 1
     try:
         if args.cmd == "pair":
-            print(f"Connecting to the {tv}: {PAIR_HINT[env.tv_os]}…")  # noqa: T201
+            print(f"Connecting to the {tv}: {PAIR_HINT[target[1]]}…")  # noqa: T201
             await remote.pair(_ask_code)
             print("Paired.")  # noqa: T201
         elif args.cmd == "key":

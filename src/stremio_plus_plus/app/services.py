@@ -9,6 +9,7 @@ from pathlib import Path
 import httpx
 
 from stremio_plus_plus.app.picker import Picker
+from stremio_plus_plus.app.tv_service import TvService
 from stremio_plus_plus.config.env import Env
 from stremio_plus_plus.config.settings_file import SettingsFile
 from stremio_plus_plus.downloads.manager import DownloadManager
@@ -21,6 +22,7 @@ from stremio_plus_plus.subtitles.model_cache import ModelDownload
 from stremio_plus_plus.subtitles.store import SubtitleStore
 from stremio_plus_plus.subtitles.translators.registry import ConfiguredTranslator
 from stremio_plus_plus.tls.addon import AddonTls
+from stremio_plus_plus.watch.clients import ClientMonitor
 from stremio_plus_plus.watch.events import Event
 
 
@@ -65,3 +67,5 @@ class Services:
     playback_handlers: Sequence[Callable[[Event], Awaitable[None]]]
     translator: ConfiguredTranslator
     model_download: ModelDownload
+    clients: ClientMonitor
+    tv: TvService

@@ -34,6 +34,12 @@ def _services(request: Request) -> Services:
     return request.app.state.services
 
 
+def tv_server_url(services: Services) -> str | None:
+    """What the TV's Stremio server URL must be: this host's server over its stremio.rocks name."""
+    domain = server_domain(services.env.stremio_server_data_dir)
+    return f"https://{domain}:{HTTPS_PORT}" if domain else None
+
+
 def _check(
     id_: str, label: str, level: Level, detail: str, fix: str | None = None
 ) -> dict[str, Any]:
@@ -126,6 +132,16 @@ async def _checks(services: Services) -> list[dict[str, Any]]:
             None if cached else "download_model",
         )
     )
+    seen = services.clients.last_seen
+    out.append(
+        _check(
+            "tv_connected",
+            "TV connected",
+            "ok" if seen and tv_ready else "warn",
+            "a Stremio app is using this server" if seen and tv_ready else "waiting for the TV",
+            None,
+        )
+    )
     free = free_bytes(services.cache_dir)
     level: Level = "ok" if free >= DISK_OK else "warn" if free >= DISK_MIN else "bad"
     out.append(
@@ -143,14 +159,13 @@ async def _checks(services: Services) -> list[dict[str, Any]]:
 @router.get("")
 async def setup_state(request: Request) -> dict[str, Any]:
     services = _services(request)
-    domain = server_domain(services.env.stremio_server_data_dir)
     marker = services.env.companion_data_dir / MARKER
     return {
         "completed": marker.exists(),
         "checks": await _checks(services),
         "lan_ip": str(services.host.lan_ip),
         "tv": {
-            "server_url": f"https://{domain}:{HTTPS_PORT}" if domain else None,
+            "server_url": tv_server_url(services),
             "revert_url": REVERT_URL,
         },
         "addon_url": services.host.manifest_url,
