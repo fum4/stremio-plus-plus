@@ -23,6 +23,8 @@ class TranslatorSettings(_Section):
     max_calls_per_hour: int = Field(default=120, ge=1, le=10_000)
     timeout_s: int = Field(default=180, ge=10, le=3600)
     context_cues: int = Field(default=15, ge=0, le=200)
+    # Free-form style for the wording ("like a cowboy", "formal", …); the format rules still hold.
+    style: str = Field(default="", max_length=2000)
 
 
 class SpeechSettings(_Section):
@@ -58,3 +60,5 @@ class Secrets(_Section):
     """`secrets.toml` (mode 0600, next to config.toml): never in config.toml, never sent back."""
 
     anthropic_api_key: str | None = None
+    # The addon URL's secret path segment when ADDON_TOKEN isn't in the environment (host.py).
+    addon_token: str | None = Field(default=None, min_length=24)

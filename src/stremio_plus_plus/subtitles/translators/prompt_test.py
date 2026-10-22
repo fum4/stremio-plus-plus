@@ -1,4 +1,16 @@
-from stremio_plus_plus.subtitles.translators.prompt import build_prompt, parse_cues
+from stremio_plus_plus.subtitles.translators.prompt import (
+    SYSTEM_PROMPT,
+    build_prompt,
+    parse_cues,
+    system_prompt,
+)
+
+
+def test_a_style_replaces_the_tone_but_keeps_the_format_rules() -> None:
+    assert system_prompt("  ") == SYSTEM_PROMPT
+    styled = system_prompt("Talk like a cowboy.")
+    assert "Talk like a cowboy." in styled and "professional subtitler" not in styled
+    assert "exactly one translation per id" in styled
 
 
 def test_prompt_numbers_lines_and_trims_context() -> None:

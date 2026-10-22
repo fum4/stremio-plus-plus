@@ -1,6 +1,6 @@
 # Configuration: one file, one UI
 
-Status: **phase 1 built** (2026-10-21). Builds on [public-release.md](public-release.md); this doc owns *how a user configures stremio++*.
+Status: **phases 1–2 built** (2026-10-21): settings file + UI, first-run setup, translation style. Builds on [public-release.md](public-release.md); this doc owns *how a user configures stremio++*.
 
 ## Decisions (owner, 2026-10-21)
 | # | Decision | Choice |
@@ -48,9 +48,18 @@ Overview (server, translator calls vs cap, disk vs reserve, per-file chunk strip
 
 Dev: `mise run ui:mock` (canned data, no host) · `mise run ui:dev` (proxies to a companion) · `mise run ui:build` (also run by `services:install`).
 
+## First-run setup (phase 2, built)
+Goal: a stranger with an Apple Silicon Mac goes from `git clone` to subtitles without editing a file or owning a domain.
+- `mise run install` (setup + services + prints the UI link). Nothing is required in `.env.local`: the LAN IP is detected (`config/host.py`), the addon token is generated once into `secrets.toml`, and without `ADDON_DOMAIN` the addon is served under the streaming server's own stremio.rocks certificate (`tls/stremio_cert.py`: server.js keeps it, key included, in `<APP_PATH>/httpsCert.json`; the companion renews it through `GET /get-https` and hot-reloads it). The owner's own domain, TV control and encrypted token stay as optional env values.
+- The UI opens on **Setup** until it's finished: This Mac (Apple Silicon, ffmpeg, server, disk) → Streaming server (one click: `POST /settings` with `infra/stremio-server/settings.json` + `remoteHttps`, refusing a zero cache) → Translator (pick, key, try it) → Speech model (download with progress) → Your TV (server URL + revert value; confirmed by a tick) → The addon (link, deep link, QR; ticked). It stays as a health page afterwards.
+- `with-secrets.sh`, `install-repo-secrets.sh`, the `tls` agent and the doctor all work without the owner's age key; an owner host (ADDON_DOMAIN set) without the key fails loudly instead of minting a new token.
+
+## Translation style
+`subtitles.translator.style` (free text, ≤ 2000 chars, presets in the UI): it **replaces** the tone guidance of the system prompt (next to "as a professional subtitler would" the model plays it safe) while the id/format rules stay. Verified on Haiku 5.5: "cowboy" → *Unde dracu' ai fost, partenere? / Ne cărăm. Acum.* Applies to newly generated windows; **Regenerate** (Overview, `POST /api/subtitles/{hash}/{file}/regenerate`) forgets a film's subtitles so they're redone playhead-first, dropping any translation started before the click.
+
 ## Next
 1. **Profiles + languages (decision 2):** `languages = [...]` per install URL, `behaviorHints.configurable` + `/configure` page; STT once per file, translation per language (store keyed by language, append-only migration); one prompt template per language.
 2. **`openai-compatible` backend** (covers local models), then benchmark candidates on Batman.
 3. **Server tuning in the file:** cache size (never 0) and the torrent profile from `infra/stremio-server/settings.json` move into `config.toml`, applied through `POST /settings`.
-4. **First-run wizard** in the UI: LAN IP, HTTPS mode, provider + key, Whisper model download with progress, TV pairing, then the TV-side step with its revert ([tv-setup.md](../runbooks/tv-setup.md)).
+4. **TV from the wizard:** type the server URL on the TV through `tv/` (needs the companion to own TV pairing), and detect "TV online" from the server log instead of a tick.
 5. **Admin password** for the UI once hosts are shared beyond one household.

@@ -2,7 +2,7 @@
 
 from stremio_plus_plus.config.env import Env
 from stremio_plus_plus.tv.androidtv import AndroidTvRemote
-from stremio_plus_plus.tv.base import TvRemote
+from stremio_plus_plus.tv.base import TvControlError, TvRemote
 from stremio_plus_plus.tv.constants import (
     ANDROIDTV_CERT_FILE,
     ANDROIDTV_KEY_FILE,
@@ -16,6 +16,8 @@ from stremio_plus_plus.tv.webos import WebOsRemote
 
 
 def make_remote(env: Env) -> TvRemote:
+    if env.tv_host is None or env.tv_os is None:
+        raise TvControlError("no TV configured: set TV_HOST and TV_OS in .env.local")
     host, data = str(env.tv_host), env.companion_data_dir
     match env.tv_os:
         case "samsung":

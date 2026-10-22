@@ -30,7 +30,9 @@ async def stream(request: Request, kind: str, item_id: str) -> dict[str, Any]:
     offer = await services.picker.pick(kind, item_id)
     if offer is None:
         return {"streams": []}
-    env = services.env
+    base = services.host.addon_base
+    if base is None:  # no HTTPS name yet: a stream URL the TV can't open helps nobody
+        return {"streams": []}
     c = offer.candidate
     details = " · ".join(
         part
@@ -42,7 +44,6 @@ async def stream(request: Request, kind: str, item_id: str) -> dict[str, Any]:
         )
         if part
     )
-    base = f"https://{env.addon_domain}:{env.addon_https_port}/{env.addon_token}"
     return {
         "streams": [
             {

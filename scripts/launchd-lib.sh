@@ -13,6 +13,12 @@ service_names() {
       echo "$n"
     done
   else
-    for f in "$REPO_ROOT"/launchd/*.plist.template; do basename "$f" .plist.template; done
+    for f in "$REPO_ROOT"/launchd/*.plist.template; do
+      n="$(basename "$f" .plist.template)"
+      # The lego renewal agent only exists for an own domain; without one the addon uses the
+      # streaming server's certificate, which the companion renews itself.
+      [ "$n" = tls ] && [ -z "${ADDON_DOMAIN:-}" ] && continue
+      echo "$n"
+    done
   fi
 }

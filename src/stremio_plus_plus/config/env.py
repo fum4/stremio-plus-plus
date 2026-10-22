@@ -1,7 +1,9 @@
 """The one typed view of the process environment.
 
-Every field is required: a missing or invalid value fails boot instead of falling back
-to a silent default. Values come from infra/env/companion.env (+ .env.local) via mise.
+Wiring fields are required: a missing or invalid value fails boot instead of falling back to a
+silent default. Values come from infra/env/companion.env (+ .env.local) via mise. The optional
+fields are the owner's personal setup (own domain, a TV to control, an encrypted token); a fresh
+install leaves them unset and gets the zero-config path (config/host.py, tls/stremio_cert.py).
 This is the machine wiring; what a user tunes lives in config.toml (settings.py).
 """
 
@@ -29,19 +31,39 @@ class Env(BaseSettings):
     config_dir: Path
     # The built admin UI (web/, `mise run ui:build`); served on the LAN port when present.
     ui_dir: Path
-    host_lan_ip: IPv4Address
-    tv_host: IPv4Address
-    tv_os: TvOs  # which tv/ adapter controls the TV; only samsung is verified on hardware
+    # The streaming server's data dir (launchd APP_PATH): holds its stremio.rocks certificate.
+    stremio_server_data_dir: Path
+    # Applied to the server by the setup (POST /settings merges), plus remoteHttps = the LAN IP.
+    stremio_server_settings: Path
+    # Unset: detected from the default route (config/host.py).
+    host_lan_ip: IPv4Address | None = None
+    # A TV to control (tv/, `mise run tv`); the companion itself never needs one.
+    tv_host: IPv4Address | None = None
+    tv_os: TvOs | None = None  # which tv/ adapter; only samsung is verified on hardware
     claude_cli: Path
-    addon_domain: str = Field(min_length=1)
+    # Unset: the addon is served under the streaming server's stremio.rocks certificate.
+    addon_domain: str | None = Field(default=None, min_length=1)
     addon_https_port: int = Field(ge=1, le=65535)
-    # Secret path segment of the public addon URL (secrets/companion.env.age; repo-secrets exec).
-    addon_token: str = Field(min_length=24, repr=False)
+    # Secret path segment of the addon URL. Unset: generated once into secrets.toml.
+    addon_token: str | None = Field(default=None, min_length=24, repr=False)
     log_level: LogLevel
     log_format: LogFormat
 
     @field_validator(
-        "stremio_server_log", "companion_data_dir", "config_dir", "claude_cli", mode="before"
+        "host_lan_ip", "tv_host", "tv_os", "addon_domain", "addon_token", mode="before"
+    )
+    @classmethod
+    def _empty_is_unset(cls, value: object) -> object:
+        """`KEY=` in .env.local means "deliberately not set" (with-secrets.sh needs it set)."""
+        return None if value == "" else value
+
+    @field_validator(
+        "stremio_server_log",
+        "stremio_server_data_dir",
+        "companion_data_dir",
+        "config_dir",
+        "claude_cli",
+        mode="before",
     )
     @classmethod
     def _expand_home(cls, value: object) -> object:

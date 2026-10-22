@@ -57,6 +57,28 @@ class StremioServer:
         data = cast(dict[str, Any] | None, resp.json())
         return float(data.get("streamProgress") or 0) if data else None
 
+    async def settings(self) -> dict[str, Any]:
+        """The server's current settings values (GET /settings)."""
+        resp = await self._http.get(f"{self._base}/settings", timeout=REQUEST_TIMEOUT_S)
+        resp.raise_for_status()
+        return cast(dict[str, Any], resp.json()["values"])
+
+    async def update_settings(self, values: dict[str, Any]) -> None:
+        """POST /settings merges into the server's settings and persists them."""
+        resp = await self._http.post(
+            f"{self._base}/settings", json=values, timeout=REQUEST_TIMEOUT_S
+        )
+        resp.raise_for_status()
+        if not cast(dict[str, Any], resp.json()).get("success"):
+            raise RuntimeError(f"server refused the settings: {resp.text[:200]}")
+
+    async def request_https(self, ip: str) -> None:
+        """Have the server fetch (or renew) its stremio.rocks certificate for this LAN IP."""
+        resp = await self._http.get(
+            f"{self._base}/get-https", params={"ipAddress": ip}, timeout=OPENSUB_HASH_TIMEOUT_S
+        )
+        resp.raise_for_status()
+
     async def cache_dir(self) -> Path:
         """`<cacheRoot>/stremio-cache`: one sub-directory per info hash (server.js getCachePath)."""
         resp = await self._http.get(f"{self._base}/settings", timeout=REQUEST_TIMEOUT_S)

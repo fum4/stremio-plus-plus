@@ -5,6 +5,8 @@ import type {
   Status,
   TranslatorSettings,
   TranslatorTest,
+  ModelDownload,
+  SetupState,
 } from "./types";
 
 export class ApiError extends Error {}
@@ -34,4 +36,11 @@ export const api = {
   status: () => call<Status>("GET", "/status"),
   testTranslator: (settings: TranslatorSettings) =>
     call<TranslatorTest>("POST", "/translator/test", settings),
+  regenerate: (infoHash: string, fileIndex: number) =>
+    call<{ ok: boolean }>("POST", `/subtitles/${infoHash}/${fileIndex}/regenerate`),
+  setup: () => call<SetupState>("GET", "/setup"),
+  setupServer: () => call<SetupState>("POST", "/setup/server"),
+  setupModel: () => call<ModelDownload>("POST", "/setup/model"),
+  modelProgress: () => call<ModelDownload>("GET", "/setup/model"),
+  completeSetup: () => call<SetupState>("POST", "/setup/complete"),
 };

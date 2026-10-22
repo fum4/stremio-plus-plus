@@ -5,24 +5,30 @@ from pydantic import ValidationError
 
 from stremio_plus_plus.config.env import load_env
 
-VALID = {
+REQUIRED = {
     "STREMIO_SERVER_URL": "http://127.0.0.1:11470",
     "STREMIO_SERVER_LOG": "~/Library/Logs/stremio-plus-plus/server.log",
+    "STREMIO_SERVER_DATA_DIR": "~/Library/Application Support/stremio-plus-plus/stremio-server",
+    "STREMIO_SERVER_SETTINGS": "infra/stremio-server/settings.json",
     "COMPANION_HOST": "0.0.0.0",
     "COMPANION_PORT": "11471",
     "COMPANION_DATA_DIR": "/tmp/companion-data",
     "CONFIG_DIR": "~/.config/stremio-plus-plus",
     "UI_DIR": "web/dist",
-    "HOST_LAN_IP": "192.168.1.132",
-    "TV_HOST": "192.168.1.134",
-    "TV_OS": "samsung",
     "CLAUDE_CLI": "~/.local/bin/claude",
-    "ADDON_DOMAIN": "stremio.nomadware.io",
     "ADDON_HTTPS_PORT": "8443",
-    "ADDON_TOKEN": "x" * 32,
     "LOG_LEVEL": "INFO",
     "LOG_FORMAT": "json",
 }
+# The owner's personal setup; a fresh install has none of these.
+OPTIONAL = {
+    "HOST_LAN_IP": "192.168.1.132",
+    "TV_HOST": "192.168.1.134",
+    "TV_OS": "samsung",
+    "ADDON_DOMAIN": "stremio.nomadware.io",
+    "ADDON_TOKEN": "x" * 32,
+}
+VALID = REQUIRED | OPTIONAL
 
 
 @pytest.fixture
@@ -52,8 +58,31 @@ def test_expands_home_in_paths(env: pytest.MonkeyPatch) -> None:
     )
 
 
-@pytest.mark.parametrize("missing", sorted(VALID))
-def test_fails_on_any_missing_value(env: pytest.MonkeyPatch, missing: str) -> None:
+def test_a_fresh_install_needs_none_of_the_personal_values(env: pytest.MonkeyPatch) -> None:
+    for key, value in REQUIRED.items():
+        env.setenv(key, value)
+    loaded = load_env()
+    assert (loaded.host_lan_ip, loaded.addon_domain, loaded.addon_token, loaded.tv_os) == (
+        None,
+        None,
+        None,
+        None,
+    )
+
+
+def test_an_empty_optional_value_means_unset(env: pytest.MonkeyPatch) -> None:
+    _set_all(env, ADDON_DOMAIN="", TV_HOST="", TV_OS="", ADDON_TOKEN="")
+    loaded = load_env()
+    assert (loaded.addon_domain, loaded.tv_host, loaded.tv_os, loaded.addon_token) == (
+        None,
+        None,
+        None,
+        None,
+    )
+
+
+@pytest.mark.parametrize("missing", sorted(REQUIRED))
+def test_fails_on_any_missing_required_value(env: pytest.MonkeyPatch, missing: str) -> None:
     for key, value in VALID.items():
         if key != missing:
             env.setenv(key, value)

@@ -258,3 +258,17 @@ async def test_until_the_track_is_picked_only_the_start_is_generated(tmp_path: P
     jobs.want(IH, 2)
     await _until(lambda: _complete(store))
     runner.cancel()
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("fake_audio")
+async def test_regenerate_forgets_the_file_and_generates_it_again(tmp_path: Path) -> None:
+    jobs, store = _jobs(tmp_path, FakeStt())
+    jobs.ensure(IH, 2, "Show.S01E03.mkv", LENGTH)
+    jobs.want(IH, 2)  # the viewer picked the track: the whole file, not just PRIME_S
+    runner = asyncio.create_task(jobs.run())
+    await _until(lambda: _complete(store))
+    jobs.regenerate(IH, 2)
+    assert not _complete(store)
+    await _until(lambda: _complete(store))
+    runner.cancel()

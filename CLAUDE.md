@@ -29,6 +29,7 @@ A Python service + launchd setup on the owner's Mac (**Batman**) that extends th
 | Occasion | Doc | Guardrail |
 |---|---|---|
 | Make it usable by others (config, providers, distribution) | [docs/design/public-release.md](docs/design/public-release.md) · [docs/design/config-ui.md](docs/design/config-ui.md) | settings are file-first (`config.toml`); distribution questions in public-release.md still need the owner |
+| First-run setup for a new user | README § Install · [docs/design/config-ui.md](docs/design/config-ui.md) § First-run | a fresh clone must work with an empty `.env.local`; personal values stay optional |
 | Move to another host | [docs/runbooks/migrate-host.md](docs/runbooks/migrate-host.md) | everything per-machine lives in `.env.local`, `state.db` and logins; `mise run host:doctor` must be all green |
 | Change anything on the TV | [docs/runbooks/tv-setup.md](docs/runbooks/tv-setup.md) | record the current value and the revert step first |
 | Rely on a server.js behaviour | [docs/research/stremio-internals.md](docs/research/stremio-internals.md) | re-verify against the pinned bundle; cite file:line |

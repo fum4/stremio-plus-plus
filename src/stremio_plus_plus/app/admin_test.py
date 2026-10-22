@@ -67,3 +67,12 @@ def test_status_includes_torrents_and_the_install_url(tmp_path: Path) -> None:
     assert status["server"]["ok"] and status["torrents"][0]["name"] == "Movie"
     assert status["addon"]["manifest_url"].endswith(f"/{TOKEN}/manifest.json")
     assert status["translator"]["provider"] == "claude-cli"
+
+
+def test_regenerate_forgets_the_file(tmp_path: Path) -> None:
+    client, services = _client(tmp_path)
+    services.subtitle_store.save_span("ab" * 20, 0, (0.0, 10.0), [])
+    assert client.post(f"/api/subtitles/{'ab' * 20}/0/regenerate", headers=UI).json() == {
+        "ok": True
+    }
+    assert services.subtitle_store.spans("ab" * 20, 0) == []

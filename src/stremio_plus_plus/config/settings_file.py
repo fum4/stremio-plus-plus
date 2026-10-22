@@ -27,6 +27,7 @@ model = "claude-haiku-5-5"
 max_calls_per_hour = 120       # hard cap, protects a subscription or a budget
 timeout_s = 180
 context_cues = 15              # earlier subtitles sent along for continuity
+style = ""                     # optional: how the translation should sound, e.g. "like a cowboy"
 
 [subtitles.speech]
 engine = "mlx-whisper"         # Apple Silicon

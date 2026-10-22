@@ -8,6 +8,7 @@ export interface TranslatorSettings {
   max_calls_per_hour: number;
   timeout_s: number;
   context_cues: number;
+  style: string;
 }
 
 export interface SpeechSettings {
@@ -81,7 +82,7 @@ export interface Status {
     last_error: string | null;
   };
   disk: { free: number; reserve: number };
-  addon: { manifest_url: string };
+  addon: { manifest_url: string | null; https: "own-domain" | "stremio" | null };
   settings_version: string;
 }
 
@@ -90,4 +91,32 @@ export interface TranslatorTest {
   error: string | null;
   seconds?: number;
   lines?: { source: string; target: string }[];
+}
+
+export type CheckLevel = "ok" | "warn" | "bad";
+
+export interface SetupCheck {
+  id: "mac" | "tools" | "server" | "server_tv" | "https" | "translator" | "model" | "disk";
+  label: string;
+  level: CheckLevel;
+  detail: string;
+  // A shell command or advice, or an action id the wizard knows (configure_server, …).
+  fix: string | null;
+}
+
+export interface ModelDownload {
+  model: string;
+  state: "idle" | "running" | "done" | "failed";
+  total?: number | null;
+  downloaded?: number;
+  error?: string | null;
+}
+
+export interface SetupState {
+  completed: boolean;
+  checks: SetupCheck[];
+  lan_ip: string;
+  tv: { server_url: string | null; revert_url: string };
+  addon_url: string | null;
+  model: ModelDownload;
 }

@@ -3,6 +3,8 @@
 COMPANION_TAG = "src=companion"
 REQUEST_TIMEOUT_S = 10.0
 CACHE_SUBDIR = "stremio-cache"
+# Where server.js serves HTTPS once remoteHttps is set (the TV's server URL uses it).
+HTTPS_PORT = 12470
 # Hashing reads the file's first and last 64 KiB, which may first have to be downloaded.
 OPENSUB_HASH_TIMEOUT_S = 120.0
 # server.js /subtitles.vtt gives up on fetching an addon's subtitle source after ~10 s and

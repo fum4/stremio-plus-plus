@@ -10,11 +10,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from stremio_plus_plus.app import admin
+from stremio_plus_plus.app import admin, setup
 from stremio_plus_plus.app.addon import addon_router, lan_router
 from stremio_plus_plus.app.https_guard import HttpsGuard
 from stremio_plus_plus.app.picker import Picker
-from stremio_plus_plus.app.services import Services
+from stremio_plus_plus.app.services import HostInfo, Services
 from stremio_plus_plus.app.stream_routes import router as stream_router
 from stremio_plus_plus.app.subtitle_switch import SubtitleSwitch
 from stremio_plus_plus.config.env import Env
@@ -27,6 +27,7 @@ from stremio_plus_plus.state.db import open_db
 from stremio_plus_plus.state.plays import Plays
 from stremio_plus_plus.stream.sessions import Sessions
 from stremio_plus_plus.subtitles.jobs import SubtitleJobs
+from stremio_plus_plus.subtitles.model_cache import ModelDownload
 from stremio_plus_plus.subtitles.store import SubtitleStore
 from stremio_plus_plus.subtitles.stt import WhisperMlx
 from stremio_plus_plus.subtitles.translators.registry import ConfiguredTranslator
@@ -51,8 +52,7 @@ async def _watch_settings(settings_file: SettingsFile) -> None:
         reported = settings_file.error
 
 
-def create_app(env: Env) -> FastAPI:
-    settings_file = SettingsFile(env.config_dir)  # before serving: a broken file fails boot
+def create_app(env: Env, settings_file: SettingsFile, host: HostInfo) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
@@ -77,6 +77,7 @@ def create_app(env: Env) -> FastAPI:
             handlers = [PlayRecorder(server, plays), downloads, subtitles]
             services = Services(
                 env=env,
+                host=host,
                 settings_file=settings_file,
                 http=http,
                 db=db,
@@ -91,6 +92,7 @@ def create_app(env: Env) -> FastAPI:
                 sessions=sessions,
                 playback_handlers=handlers,
                 translator=translator,
+                model_download=ModelDownload(),
             )
             app.state.services = services
             workers = [
@@ -132,7 +134,8 @@ def create_app(env: Env) -> FastAPI:
     app.include_router(stream_router)
     app.include_router(lan_router)
     app.include_router(admin.router)
-    app.add_middleware(HttpsGuard, https_port=env.addon_https_port, token=env.addon_token)
+    app.include_router(setup.router)
+    app.add_middleware(HttpsGuard, https_port=env.addon_https_port, token=host.addon_token)
 
     @app.get("/health")
     async def health() -> dict[str, str]:  # pyright: ignore[reportUnusedFunction]

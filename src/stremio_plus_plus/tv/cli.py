@@ -19,7 +19,12 @@ async def _ask_code() -> str:
 
 async def _run(args: argparse.Namespace) -> int:
     env = load_env()
-    remote = make_remote(env)
+    try:
+        remote = make_remote(env)
+    except TvControlError as exc:
+        print(exc)  # noqa: T201
+        return 1
+    assert env.tv_os is not None  # make_remote checked it
     tv = f"TV {env.tv_host} ({env.tv_os})"
     if args.cmd == "status":
         print(f"{tv}: {'paired' if remote.paired else 'not paired'}")  # noqa: T201  (CLI output)

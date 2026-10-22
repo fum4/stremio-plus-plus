@@ -16,6 +16,7 @@ from stremio_plus_plus.subtitles.translators.base import (
     TranslatorStats,
 )
 from stremio_plus_plus.subtitles.translators.claude_cli import ClaudeCliBackend
+from stremio_plus_plus.subtitles.translators.prompt import system_prompt
 
 
 @dataclass(frozen=True)
@@ -93,7 +94,13 @@ class ConfiguredTranslator:
         """A standalone translator for the UI's "test" button: its own tiny cap (never waits on or
         spends the jobs' hourly budget) and its own lock (a click doesn't queue behind a chunk)."""
         backend = build_backend(settings, secrets, self._claude_bin)
-        return LlmTranslator(backend, HourlyCap(ATTEMPTS), settings.context_cues, TranslatorStats())
+        return LlmTranslator(
+            backend,
+            HourlyCap(ATTEMPTS),
+            settings.context_cues,
+            TranslatorStats(),
+            system=system_prompt(settings.style),
+        )
 
     async def translate(self, lines: list[str], context: list[str]) -> list[str]:
         key = (self._settings, self._file.secrets)
@@ -102,6 +109,11 @@ class ConfiguredTranslator:
             self._cap.limit = key[0].max_calls_per_hour
             backend = build_backend(key[0], key[1], self._claude_bin)
             self._current = LlmTranslator(
-                backend, self._cap, key[0].context_cues, self.stats, self._lock
+                backend,
+                self._cap,
+                key[0].context_cues,
+                self.stats,
+                self._lock,
+                system=system_prompt(key[0].style),
             )
         return await self._current.translate(lines, context)
