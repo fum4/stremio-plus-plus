@@ -1,23 +1,27 @@
-"""Pick the release to play: on the laptop already > same release as the last episode >
-playable on the TV > highest resolution up to the preference > most seeders."""
+"""Pick the release to play: playable on the TV and in English > on the laptop already > same
+release as the last episode > well seeded > highest resolution up to the preference > most
+seeders."""
 
 import math
 from collections.abc import Iterable
 
 from stremio_plus_plus.sources.candidates import Candidate
-from stremio_plus_plus.sources.constants import MAX_HEIGHT
+from stremio_plus_plus.sources.constants import HEALTHY_SEEDERS, MAX_HEIGHT
 
 
 def _score(
     c: Candidate, local: dict[str, float], last_group: str | None, max_height: int
 ) -> tuple[float, ...]:
     within = 0 < c.height <= max_height
+    healthy = c.seeders >= HEALTHY_SEEDERS or c.url is not None
     return (
         float(c.playable),
+        float(c.english),
         float(not c.dolby_vision),
         local.get(c.info_hash or "", 0.0),  # fraction already downloaded
         float(bool(last_group) and c.binge_group == last_group),
         float(c.url is not None),  # debrid links start instantly and never stall on peers
+        float(healthy),
         float(within),
         float(c.height if within else -c.height),
         math.log1p(c.seeders),

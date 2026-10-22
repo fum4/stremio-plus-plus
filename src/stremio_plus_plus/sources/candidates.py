@@ -8,7 +8,13 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, cast
 
-from stremio_plus_plus.sources.constants import DOLBY_VISION, RESOLUTIONS, UNPLAYABLE
+from stremio_plus_plus.sources.constants import (
+    DOLBY_VISION,
+    ENGLISH_FLAGS,
+    FOREIGN_WORDS,
+    RESOLUTIONS,
+    UNPLAYABLE,
+)
 
 _SEEDERS = re.compile(r"👤\s*(\d+)")
 _SIZE = re.compile(r"💾\s*([\d.]+)\s*(GB|MB)", re.IGNORECASE)
@@ -30,11 +36,23 @@ class Candidate:
     height: int = 0
     dolby_vision: bool = False
     playable: bool = True
+    english: bool = True
     raw: dict[str, Any] = field(default_factory=dict[str, Any], compare=False, repr=False)
 
 
+_FLAG = re.compile("[\U0001f1e6-\U0001f1ff]{2}")
+
+
 def _height(text: str) -> int:
-    return next((h for word, h in RESOLUTIONS if word in text), 0)
+    words = set(re.split(r"[^a-z0-9]+", text))
+    return next((h for word, h in RESOLUTIONS if word in words), 0)
+
+
+def _english(text: str) -> bool:
+    flags = _FLAG.findall(text)
+    if flags and not any(f in ENGLISH_FLAGS for f in flags):
+        return False
+    return not any(word in text for word in FOREIGN_WORDS)
 
 
 def _size(text: str) -> int:
@@ -69,5 +87,6 @@ def parse(addon: str, stream: dict[str, Any]) -> Candidate | None:
         height=_height(f"{title}\n{filename}".lower()) or _height(name.lower()),
         dolby_vision=any(word in text for word in DOLBY_VISION) and "hdr10" not in text,
         playable=not any(word in text for word in UNPLAYABLE),
+        english=_english(text),
         raw=stream,
     )

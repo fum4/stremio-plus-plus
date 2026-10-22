@@ -51,3 +51,19 @@ def test_unplayable_and_dolby_vision_releases_sink() -> None:
     assert dv and av1 and ok
     assert rank([dv, av1, ok])[0] is ok
     assert not av1.playable and dv.dolby_vision
+
+
+def test_uploader_names_are_not_resolutions_and_dubs_sink() -> None:
+    raw = _torrentio("Al este del Eden [HDTV][Cap.101]\n👤 82 ⚙️ Wolfmax4k\n🇪🇸", ih="1" * 40)
+    dub = parse("t", {**raw, "name": "Torrentio\nHDTV"})
+    multi = parse("t", _torrentio("East.of.Eden.S01E01.2160p.mkv\n👤 30\n🇬🇧 / 🇷🇺", ih="2" * 40))
+    assert dub and multi
+    assert dub.height == 0 and not dub.english
+    assert multi.english and multi.height == 2160
+
+
+def test_a_poorly_seeded_4k_loses_to_a_well_seeded_1080p() -> None:
+    thin = parse("t", _torrentio("X.2160p.mkv\n👤 12", ih="3" * 40))
+    busy = parse("t", _torrentio("X.1080p.mkv\n👤 694", ih="4" * 40))
+    assert thin and busy
+    assert rank([thin, busy])[0] is busy
