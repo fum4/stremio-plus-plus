@@ -34,13 +34,15 @@
       error = e instanceof ApiError ? e.message : String(e);
     } finally {
       busy = null;
-      password = "";
+      password = ""; // secrets don't linger in the form
+      authKey = "";
     }
   }
 
   onMount(() => void run("load", api.account));
   const ours = $derived(acct?.position ?? null);
-  const signedIn = $derived(!!acct?.connected && !acct.error);
+  // Connected = a key Stremio hasn't signed out; an outage shows as an error, not a sign-out.
+  const signedIn = $derived(!!acct?.connected);
 </script>
 
 {#if acct === null}
@@ -97,6 +99,7 @@
   </div>
 {:else}
   <div class="connected" in:fly={{ y: 6, duration: 250 }}>
+    {#if acct.error}<p class="error">{acct.error}</p>{/if}
     <div class="who">
       <span class="avatar"><Check size={15} strokeWidth={3} /></span>
       <div>

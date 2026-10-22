@@ -123,3 +123,55 @@ async def test_a_revoked_session_says_so(tmp_path: Path) -> None:
     fake.keys.clear()
     state = await account.state(fresh=True)
     assert not state.connected and state.error and "connect again" in state.error
+
+
+@pytest.mark.asyncio
+async def test_a_bogus_addon_list_never_becomes_a_write(tmp_path: Path) -> None:
+    fake = FakeStremio([_addon("cinemeta")])
+    account = _account(tmp_path, fake)
+    await account.use_key("good-key")
+    for bogus in (None, {"x": 1}, ["not-a-dict"]):
+        fake.addons = bogus  # type: ignore[assignment]
+        with pytest.raises(StremioApiError):
+            await account.install()
+    fake.addons = []
+    with pytest.raises(StremioApiError, match="nothing was changed"):
+        await account.install()
+    assert fake.sets == 0
+
+
+@pytest.mark.asyncio
+async def test_odd_replies_are_api_errors_without_the_request_attached(tmp_path: Path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"result": None} if "login" in str(request.url) else [1])
+
+    api = StremioApi(httpx.AsyncClient(transport=httpx.MockTransport(handler)), "https://api.test")
+    for call in (api.login("me@example.com", "pw-secret"), api.addons("k")):
+        with pytest.raises(StremioApiError) as info:
+            await call
+        assert info.value.__cause__ is None and info.value.__suppress_context__
+
+
+@pytest.mark.asyncio
+async def test_move_to_top_works_with_keep_first_off(tmp_path: Path) -> None:
+    fake = FakeStremio([_addon("cinemeta"), _addon(OURS, URL)])
+    api = StremioApi(httpx.AsyncClient(transport=httpx.MockTransport(fake)), "https://api.test")
+    account = StremioAccount(
+        api, AuthFile(tmp_path), OURS, {"id": OURS}, lambda: URL, lambda: False
+    )
+    await account.use_key("good-key")
+    assert not await account.keep()
+    assert await account.keep(force=True) and addon_id(fake.addons[0]) == OURS
+
+
+@pytest.mark.asyncio
+async def test_an_outage_is_not_a_sign_out(tmp_path: Path) -> None:
+    fake = FakeStremio([])
+    account = _account(tmp_path, fake)
+    await account.use_key("good-key")
+    account._api = StremioApi(  # type: ignore[attr-defined]  # Stremio unreachable
+        httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(502, text="x"))),
+        "https://api.test",
+    )
+    state = await account.state(fresh=True)
+    assert state.connected and state.error and "unreachable" in state.error

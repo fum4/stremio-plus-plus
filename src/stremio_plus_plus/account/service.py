@@ -40,7 +40,7 @@ class AddonSummary:
 
 @dataclass
 class AccountState:
-    connected: bool
+    connected: bool  # a key is stored and Stremio hasn't signed it out (it may be unreachable)
     email: str | None = None
     error: str | None = None
     position: int | None = None  # of Stremio++ in the collection; None = not installed
@@ -67,6 +67,7 @@ class StremioAccount:
         self._keep_first = keep_first
         self._on_key = on_key
         self._cache: tuple[float, AccountState] | None = None
+        self._lock = asyncio.Lock()  # install and keep are read-modify-write on the collection
         if key := auth.load():
             on_key(key)
 
@@ -136,18 +137,25 @@ class StremioAccount:
             raise StremioApiError("connect your Stremio account first")
         if url is None:
             raise StremioApiError("the addon has no HTTPS address yet: finish the server step")
-        addons = await self._api.addons(key)
-        await self._api.set_addons(
-            key, ours_first(addons, self._our_id, descriptor(url, self._manifest))
-        )
+        async with self._lock:
+            addons = await self._api.addons(key)
+            _refuse_empty(addons)
+            await self._api.set_addons(
+                key, ours_first(addons, self._our_id, descriptor(url, self._manifest))
+            )
         log.info("stremio_addon_installed", position=0)
         return await self.state(fresh=True)
 
-    async def keep(self) -> bool:
-        """Put Stremio++ back first / on the current URL if it's installed. True if changed."""
+    async def keep(self, *, force: bool = False) -> bool:
+        """Put Stremio++ back first / on the current URL if it's installed. True if changed.
+        `force`: a click on "Move to the top", which doesn't depend on the keep-first setting."""
         key, url = self.key, self._manifest_url()
-        if key is None or not self._keep_first():
+        if key is None or not (force or self._keep_first()):
             return False
+        async with self._lock:
+            return await self._keep(key, url)
+
+    async def _keep(self, key: str, url: str | None) -> bool:
         addons = await self._api.addons(key)
         at = position(addons, self._our_id)
         if at is None:
@@ -156,6 +164,7 @@ class StremioAccount:
         if at == 0 and not stale_url:
             return False
         replacement = descriptor(url, self._manifest) if stale_url and url else None
+        _refuse_empty(addons)
         await self._api.set_addons(key, ours_first(addons, self._our_id, replacement))
         self._cache = None
         log.info("stremio_addon_kept_first", was_at=at, repointed=stale_url)
@@ -168,4 +177,13 @@ class StremioAccount:
                 await self.keep()
             except StremioApiError as exc:
                 log.warning("stremio_addon_keep_failed", error=str(exc))
+            except Exception:  # never let the keeper die; no secrets in scope here
+                log.exception("stremio_addon_keep_crashed")
             await asyncio.sleep(KEEP_EVERY_S)
+
+
+def _refuse_empty(addons: list[Addon]) -> None:
+    """A real account always has Stremio's own addons: an empty list is a bad read, and writing
+    a list built on it would wipe the collection."""
+    if not addons:
+        raise StremioApiError("Stremio returned no addons; nothing was changed")

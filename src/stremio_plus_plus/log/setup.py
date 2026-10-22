@@ -3,6 +3,8 @@
 import logging
 
 import structlog
+from structlog.processors import ExceptionRenderer
+from structlog.tracebacks import ExceptionDictTransformer
 
 from stremio_plus_plus.config.env import LogFormat, LogLevel
 from stremio_plus_plus.log.constants import QUIET_LOGGERS
@@ -11,7 +13,9 @@ from stremio_plus_plus.log.hub import HUB
 
 def configure_logging(level: LogLevel, fmt: LogFormat) -> None:
     renderer: structlog.types.Processor = (
-        structlog.processors.JSONRenderer() if fmt == "json" else structlog.dev.ConsoleRenderer()
+        structlog.processors.JSONRenderer()
+        if fmt == "json"
+        else structlog.dev.ConsoleRenderer(exception_formatter=structlog.dev.plain_traceback)
     )
     shared: list[structlog.types.Processor] = [
         structlog.contextvars.merge_contextvars,
@@ -20,8 +24,9 @@ def configure_logging(level: LogLevel, fmt: LogFormat) -> None:
         HUB.capture,  # the UI's log view (log/hub.py); passes events through unchanged
     ]
     # Exceptions become a structured "exception" field in JSON (pretty tracebacks on the console).
+    # No frame locals in tracebacks: they'd carry whatever a failing call held (a password, a key).
     exceptions: list[structlog.types.Processor] = (
-        [structlog.processors.dict_tracebacks] if fmt == "json" else []
+        [ExceptionRenderer(ExceptionDictTransformer(show_locals=False))] if fmt == "json" else []
     )
     structlog.configure(
         processors=[*shared, structlog.stdlib.ProcessorFormatter.wrap_for_formatter],

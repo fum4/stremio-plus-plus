@@ -28,36 +28,51 @@ class StremioApi:
         self._http = http
         self._base = base
 
-    async def _call(self, method: str, body: dict[str, Any]) -> Any:  # noqa: ANN401  # JSON
+    async def _call(self, method: str, body: dict[str, Any]) -> dict[str, Any]:
+        """The `result` object. Any failure becomes a StremioApiError raised `from None`: the
+        request body (password, authKey) must never reach a traceback, and tracebacks get logged."""
         try:
             resp = await self._http.post(f"{self._base}/{method}", json=body, timeout=TIMEOUT_S)
-            data = cast(dict[str, Any], resp.json())
-        except (httpx.HTTPError, ValueError) as exc:
-            raise StremioApiError(f"Stremio's API is unreachable ({type(exc).__name__})") from exc
-        if error := data.get("error"):
+            data: object = resp.json()
+        except Exception as exc:
+            raise StremioApiError(f"Stremio's API is unreachable ({type(exc).__name__})") from None
+        if not isinstance(data, dict):
+            raise StremioApiError("Stremio's API sent an unexpected reply") from None
+        reply = cast(dict[str, Any], data)
+        if isinstance(error := reply.get("error"), dict):
             err = cast(dict[str, Any], error)
-            raise StremioApiError(str(err.get("message", "error")), err.get("code"))
-        return data.get("result")
+            code = err.get("code")
+            raise StremioApiError(
+                str(err.get("message", "error")), code if isinstance(code, int) else None
+            ) from None
+        result = reply.get("result")
+        if not isinstance(result, dict):
+            raise StremioApiError("Stremio's API sent an unexpected reply") from None
+        return cast(dict[str, Any], result)
 
     async def login(self, email: str, password: str) -> str:
         """The authKey for an email/password account. The password goes nowhere else."""
         body = {"type": "Login", "email": email, "password": password, "facebook": False}
-        result = cast(dict[str, Any], await self._call("login", body))
-        return str(result["authKey"])
+        key = (await self._call("login", body)).get("authKey")
+        if not isinstance(key, str) or not key:
+            raise StremioApiError("Stremio's API sent no login key") from None
+        return key
 
     async def email(self, auth_key: str) -> str | None:
-        result = cast(
-            dict[str, Any], await self._call("getUser", {"type": "GetUser", "authKey": auth_key})
-        )
-        return cast(str | None, result.get("email"))
+        result = await self._call("getUser", {"type": "GetUser", "authKey": auth_key})
+        email = result.get("email")
+        return email if isinstance(email, str) else None
 
     async def addons(self, auth_key: str) -> list[dict[str, Any]]:
+        """The collection, validated: a reply that isn't a list of addons is an error, never []
+        (writing back a list built on a bogus empty one would wipe the user's addons)."""
         body = {"type": "AddonCollectionGet", "authKey": auth_key, "update": True}
-        result = cast(dict[str, Any], await self._call("addonCollectionGet", body))
-        return cast(list[dict[str, Any]], result.get("addons") or [])
+        addons = (await self._call("addonCollectionGet", body)).get("addons")
+        if not isinstance(addons, list) or not all(isinstance(a, dict) for a in addons):  # pyright: ignore[reportUnknownVariableType]
+            raise StremioApiError("Stremio's API sent an unexpected addon list") from None
+        return cast(list[dict[str, Any]], addons)
 
     async def set_addons(self, auth_key: str, addons: list[dict[str, Any]]) -> None:
         body = {"type": "AddonCollectionSet", "authKey": auth_key, "addons": addons}
-        result = cast(dict[str, Any], await self._call("addonCollectionSet", body))
-        if not result.get("success"):
-            raise StremioApiError("Stremio didn't accept the addon list")
+        if not (await self._call("addonCollectionSet", body)).get("success"):
+            raise StremioApiError("Stremio didn't accept the addon list") from None

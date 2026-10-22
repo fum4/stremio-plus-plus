@@ -88,7 +88,7 @@ async def install(request: Request) -> dict[str, Any]:
 async def keep_now(request: Request) -> dict[str, Any]:
     services = _services(request)
     try:
-        await services.account.keep()
+        await services.account.keep(force=True)
     except StremioApiError as exc:
         raise _fail(exc) from None
     return await _view(services, fresh=True)
