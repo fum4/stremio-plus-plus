@@ -21,7 +21,9 @@ from stremio_plus_plus.watch.events import FileRequested
 log = structlog.get_logger()
 router = APIRouter(prefix="/{token}", dependencies=[Depends(require_token)])
 M3U8 = "application/vnd.apple.mpegurl"
-VTT_WAIT_S = 4.0  # subtitles on but this segment's lines not generated yet: wait a little
+# Subtitles on but this segment's lines not generated yet: the player never asks twice, so an
+# empty answer loses those lines for good. It fetches ~10 s ahead, so waiting costs nothing.
+VTT_WAIT_S = 9.0
 
 
 @router.get("/stream/{kind}/{item_id}.json")

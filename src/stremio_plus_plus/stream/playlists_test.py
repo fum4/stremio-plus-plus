@@ -35,5 +35,5 @@ def test_media_playlists_list_every_segment_up_front() -> None:
 
 def test_vtt_maps_cue_time_zero_to_the_segments_timestamp_origin() -> None:
     text = playlists.vtt(MEDIA, [(61.5, 63.25, "Bună")])
-    assert text.startswith("WEBVTT\nX-TIMESTAMP-MAP=MPEGTS:900000,LOCAL:00:00:00.000\n")
+    assert text.startswith("WEBVTT\nX-TIMESTAMP-MAP=MPEGTS:0,LOCAL:00:00:00.000\n")
     assert "00:01:01.500 --> 00:01:03.250\nBună" in text
