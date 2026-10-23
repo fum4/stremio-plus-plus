@@ -1,9 +1,9 @@
 {
   "cacheSize": 4398046511104,
-  "btDownloadSpeedHardLimit": 78643200,
-  "btDownloadSpeedSoftLimit": 8388608,
-  "btHandshakeTimeout": 25000,
-  "btMaxConnections": 400,
+  "btDownloadSpeedHardLimit": 39321600,
+  "btDownloadSpeedSoftLimit": 4194304,
+  "btHandshakeTimeout": 20000,
+  "btMaxConnections": 200,
   "btMinPeersForStable": 10,
-  "btRequestTimeout": 6000
+  "btRequestTimeout": 4000
 }

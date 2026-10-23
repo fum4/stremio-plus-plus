@@ -25,7 +25,7 @@ Samsung TV — Stremio app ("Stremio Theater")
   ▼
 Mac (launchd agents, all from this repo)
   ├─ Stremio streaming server   official server.js (pinned), node        :11470 http · :12470 https
-  │     cache kept until the companion deletes it; "ultra fast" torrent profile
+  │     cache kept until the companion deletes it; "fast" torrent profile
   ├─ companion                  Python / FastAPI                :11471 http (LAN) · :8443 https (addon)
   │     ├─ watches the server log → which file the TV plays, where it seeks
   │     ├─ stream: the "Stremio++" source: best release from your addons, repackaged as HLS
