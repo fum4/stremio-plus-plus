@@ -40,6 +40,11 @@ else
   bad "streaming server down" "mise run services:install server"
 fi
 curl -sf -m3 "http://127.0.0.1:$COMPANION_PORT/health" >/dev/null && ok "companion up (:$COMPANION_PORT)" || bad "companion down" "mise run services:install companion; logs: ~/Library/Logs/stremio-plus-plus/companion.log"
+settings_err="$(curl -sf -m3 -H 'X-Stremio-Plus-Plus: 1' "http://127.0.0.1:$COMPANION_PORT/api/settings" | python3 -c 'import json,sys; print(json.load(sys.stdin)["error"] or "")' 2>/dev/null)"
+if [ -n "$settings_err" ]; then
+  bad "config.toml is invalid (last good settings still running): $settings_err" "fix ${CONFIG_DIR:-~/.config/stremio-plus-plus}/config.toml or use the UI"
+fi
+[ -f "${UI_DIR:-web/dist}/index.html" ] && ok "admin UI built: http://${HOST_LAN_IP:-<host>}:$COMPANION_PORT/" || warn "admin UI not built" "mise run ui:build"
 launchctl print "gui/$(id -u)/io.github.fum4.stremio-plus-plus.cleanup" >/dev/null 2>&1 && ok "daily cleanup agent loaded" || bad "cleanup agent missing" "mise run services:install cleanup"
 
 echo "Addon (HTTPS)"
@@ -77,7 +82,8 @@ if [ -n "$tv_up" ]; then ok "TV reachable ($tv_os at $TV_HOST:$tv_up)"; else war
 python -m stremio_plus_plus.tv.cli status >/dev/null 2>&1 && ok "this host is paired with the TV" || bad "not paired with the TV" "mise run tv -- pair ($tv_pair)"
 
 echo "Data"
-if python -c 'from huggingface_hub import try_to_load_from_cache as t; from stremio_plus_plus.subtitles.constants import WHISPER_MODEL as m; import sys; sys.exit(0 if isinstance(t(m, "config.json"), str) else 1)' 2>/dev/null; then
+# The model named in config.toml (subtitles.speech.model).
+if python -c 'import os, sys; from pathlib import Path; from huggingface_hub import try_to_load_from_cache as t; from stremio_plus_plus.config.settings_file import SettingsFile; m = SettingsFile(Path(os.environ["CONFIG_DIR"]).expanduser()).settings.subtitles.speech.model; sys.exit(0 if isinstance(t(m, "config.json"), str) else 1)' 2>/dev/null; then
   ok "Whisper model cached"
 else
   bad "Whisper model not downloaded" "mise run models:fetch"

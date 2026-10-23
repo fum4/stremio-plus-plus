@@ -11,6 +11,8 @@ VALID = {
     "COMPANION_HOST": "0.0.0.0",
     "COMPANION_PORT": "11471",
     "COMPANION_DATA_DIR": "/tmp/companion-data",
+    "CONFIG_DIR": "~/.config/stremio-plus-plus",
+    "UI_DIR": "web/dist",
     "HOST_LAN_IP": "192.168.1.132",
     "TV_HOST": "192.168.1.134",
     "TV_OS": "samsung",

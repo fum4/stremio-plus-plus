@@ -14,8 +14,10 @@ A Python service + launchd setup on the owner's Mac (**Batman**) that extends th
 - **The translation model never sees timestamps.** Cue ids in, cue ids out; code re-applies timings and re-wraps (≤ 2 lines × ~42 chars).
 
 ## Layering (src/stremio_plus_plus/)
-`config/` (typed env, the only reader of the environment) · `log/` → `server/` (Stremio server HTTP client) · `state/` (SQLite, append-only migrations) → `watch/` (server-log tracker → playback events) → feature packages (`downloads/`, `subtitles/`, `stream/`, `sources/`) → `app/` (FastAPI routes + lifespan wiring) → `boot.py`. Imports point only leftwards; feature packages never import each other. One concern per file, ≤ ~200 LOC, a `constants.py` per package for magic values, tests as `*_test.py` next to the code (Python module names are `snake_case`; the global kebab-case filename rule yields to the import system here).
+`config/` (typed env, the only reader of the environment; `config.toml` user settings) · `log/` → `server/` (Stremio server HTTP client) · `state/` (SQLite, append-only migrations) → `watch/` (server-log tracker → playback events) → feature packages (`downloads/`, `subtitles/`, `stream/`, `sources/`) → `app/` (FastAPI routes + lifespan wiring) → `boot.py`. Imports point only leftwards; feature packages never import each other. One concern per file, ≤ ~200 LOC, a `constants.py` per package for magic values, tests as `*_test.py` next to the code (Python module names are `snake_case`; the global kebab-case filename rule yields to the import system here).
 - Every request the companion makes to the server carries `?src=companion` (`server.client.StremioServer.file_url`) so the tracker never mistakes our reads for the TV's.
+- **Settings are file-first.** What a user tunes lives in `~/.config/stremio-plus-plus/config.toml` (`config/settings.py`; secrets in `secrets.toml`, 0600). The UI, hand edits and agents all write that one file; the companion hot-reloads it. A new knob = a field in `settings.py` + the template in `settings_file.py` + its UI control (`web/`). Machine wiring (ports, paths, IPs) stays in `infra/env/`.
+- Translator providers sit behind one adapter (`subtitles/translators/`): a new provider is a `Backend` (one `complete` call) + a row in `registry.py`.
 - Per-run env overrides go through `mise exec -- env KEY=… <cmd>`: mise's env files win over variables set before `mise exec`.
 
 ## Mac-specific workflow (no `wt`, `devstack`, Ansible on Batman)
@@ -26,7 +28,7 @@ A Python service + launchd setup on the owner's Mac (**Batman**) that extends th
 ## Routing
 | Occasion | Doc | Guardrail |
 |---|---|---|
-| Make it usable by others (config, providers, distribution) | [docs/design/public-release.md](docs/design/public-release.md) | proposal: nothing built until the owner decides the open questions |
+| Make it usable by others (config, providers, distribution) | [docs/design/public-release.md](docs/design/public-release.md) · [docs/design/config-ui.md](docs/design/config-ui.md) | settings are file-first (`config.toml`); distribution questions in public-release.md still need the owner |
 | Move to another host | [docs/runbooks/migrate-host.md](docs/runbooks/migrate-host.md) | everything per-machine lives in `.env.local`, `state.db` and logins; `mise run host:doctor` must be all green |
 | Change anything on the TV | [docs/runbooks/tv-setup.md](docs/runbooks/tv-setup.md) | record the current value and the revert step first |
 | Rely on a server.js behaviour | [docs/research/stremio-internals.md](docs/research/stremio-internals.md) | re-verify against the pinned bundle; cite file:line |

@@ -90,6 +90,8 @@ async def test_resume_mid_file_starts_ahead_of_the_playhead_then_covers_everythi
     ahead = [o for o in stt.offsets if o >= 310.5]
     assert ahead == sorted(ahead)  # forward from the playhead before any back-fill
     assert all(c.text.startswith("ro:") for c in store.cues(IH, 2))
+    (job,) = jobs.progress()
+    assert (job.covered, job.duration_s, job.failed) == (((0.0, 600.0),), 600.0, False)
 
 
 @pytest.mark.asyncio

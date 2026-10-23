@@ -1,6 +1,6 @@
 # Move the setup to another Mac
 
-Everything the host needs is in this repo; per-machine state is three things: `.env.local`, the companion's `state.db` (subtitles + play history), and logins. Allow ~30 min, most of it downloads.
+Everything the host needs is in this repo; per-machine state is four things: `.env.local`, your settings in `~/.config/stremio-plus-plus/` (`config.toml` + `secrets.toml`), the companion's `state.db` (subtitles + play history), and logins. Allow ~30 min, most of it downloads.
 
 ## Before you start: is this Mac a good host?
 - **Apple Silicon** (M1 or later): Whisper runs on MLX. An Intel Mac can't generate subtitles.
@@ -23,6 +23,7 @@ Everything the host needs is in this repo; per-machine state is three things: `.
    (Only if Claude Code lives elsewhere: `CLAUDE_CLI=<path>`.)
 5. **Bring over the history (optional but recommended)** — demote the old Mac first (`mise run host:demote`), then copy
    `~/Library/Application Support/stremio-plus-plus/companion/state.db*` from old → same path on the new Mac. Generated subtitles come with it; the torrent cache doesn't need to (it re-downloads).
+   Copy `~/.config/stremio-plus-plus/` too (keep `secrets.toml` at mode 600); without it the new host starts on the defaults.
 6. **Install:** `mise run host:promote` (Brewfile, venv, git hooks, Whisper model ~1.6 GB, **TLS certificate**, launchd agents: server, companion, daily cleanup, weekly certificate renewal, **pairing with the TV**, then the doctor). Have the TV on: when it shows **"stremio++ wants to connect"**, press **Allow** within a minute. From then on this host controls the TV (`mise run tv -- key KEY_HOME`, `mise run tv -- text '<url>'`). Fix anything red; `mise run host:doctor` re-checks any time.
 7. **Addon address:** `host:promote` already fetched the certificate. If the new Mac has a **different LAN IP**, update the `stremio` record in `fum4/Nomadware.io` (`infra/terraform/records.tf`, then `mise run tf -- apply`); with the same reserved IP nothing changes. `mise run host:doctor` checks it.
 

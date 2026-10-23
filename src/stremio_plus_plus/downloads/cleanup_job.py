@@ -9,8 +9,8 @@ import httpx
 import structlog
 
 from stremio_plus_plus.config.env import load_env
+from stremio_plus_plus.config.settings_file import SettingsFile
 from stremio_plus_plus.downloads.cleanup import plan_cleanup, scan_cache
-from stremio_plus_plus.downloads.constants import MIN_FREE_BYTES, STALE_AFTER_S
 from stremio_plus_plus.downloads.disk import free_bytes
 from stremio_plus_plus.log.setup import configure_logging
 from stremio_plus_plus.server.client import StremioServer
@@ -22,6 +22,7 @@ log = structlog.get_logger()
 
 async def run_cleanup(*, dry_run: bool) -> None:
     env = load_env()
+    policy = SettingsFile(env.config_dir).settings.downloads
     async with httpx.AsyncClient() as http:
         server = StremioServer(env.server_base, http)
         # Server down = fail: without the live-engine list nothing is safe to delete.
@@ -36,8 +37,8 @@ async def run_cleanup(*, dry_run: bool) -> None:
             active,
             now=time.time(),
             free_bytes=free_bytes(cache_dir),
-            stale_after_s=STALE_AFTER_S,
-            min_free_bytes=MIN_FREE_BYTES,
+            stale_after_s=policy.stale_after_s,
+            min_free_bytes=policy.min_free_bytes,
         )
         for torrent in doomed:
             age_days = round((time.time() - torrent.last_used) / 86400, 1)

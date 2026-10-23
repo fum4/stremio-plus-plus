@@ -2,6 +2,7 @@
 
 Every field is required: a missing or invalid value fails boot instead of falling back
 to a silent default. Values come from infra/env/companion.env (+ .env.local) via mise.
+This is the machine wiring; what a user tunes lives in config.toml (settings.py).
 """
 
 from ipaddress import IPv4Address
@@ -24,6 +25,10 @@ class Env(BaseSettings):
     companion_host: str = Field(min_length=1)
     companion_port: int = Field(ge=1, le=65535)
     companion_data_dir: Path
+    # config.toml + secrets.toml (settings_file.py): what the user tunes (by hand, agent or UI).
+    config_dir: Path
+    # The built admin UI (web/, `mise run ui:build`); served on the LAN port when present.
+    ui_dir: Path
     host_lan_ip: IPv4Address
     tv_host: IPv4Address
     tv_os: TvOs  # which tv/ adapter controls the TV; only samsung is verified on hardware
@@ -35,7 +40,9 @@ class Env(BaseSettings):
     log_level: LogLevel
     log_format: LogFormat
 
-    @field_validator("stremio_server_log", "companion_data_dir", "claude_cli", mode="before")
+    @field_validator(
+        "stremio_server_log", "companion_data_dir", "config_dir", "claude_cli", mode="before"
+    )
     @classmethod
     def _expand_home(cls, value: object) -> object:
         return Path(value).expanduser() if isinstance(value, str) else value

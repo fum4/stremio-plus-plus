@@ -1,0 +1,60 @@
+"""User settings: the typed shape of `config.toml` (CONFIG_DIR).
+
+The file is the source of truth: people, agents and the UI all edit the same TOML. Every field
+has a default, so a missing file or section means "the defaults", and an unknown key is an error
+(a typo must not silently do nothing).
+"""
+
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+TranslatorProvider = Literal["claude-cli", "anthropic"]
+SpeechEngine = Literal["mlx-whisper"]
+
+
+class _Section(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class TranslatorSettings(_Section):
+    provider: TranslatorProvider = "claude-cli"
+    model: str = Field(default="claude-haiku-5-5", min_length=1)
+    max_calls_per_hour: int = Field(default=120, ge=1, le=10_000)
+    timeout_s: int = Field(default=180, ge=10, le=3600)
+    context_cues: int = Field(default=15, ge=0, le=200)
+
+
+class SpeechSettings(_Section):
+    engine: SpeechEngine = "mlx-whisper"
+    model: str = Field(default="mlx-community/whisper-large-v3-turbo", min_length=1)
+    source_language: str = Field(default="en", min_length=2, max_length=3)
+
+
+class SubtitleSettings(_Section):
+    translator: TranslatorSettings = TranslatorSettings()
+    speech: SpeechSettings = SpeechSettings()
+
+
+class DownloadSettings(_Section):
+    min_free_gb: float = Field(default=3.0, ge=0.5, le=10_000)
+    stale_after_days: float = Field(default=7.0, ge=0.5, le=3650)
+
+    @property
+    def min_free_bytes(self) -> int:
+        return int(self.min_free_gb * 1024**3)
+
+    @property
+    def stale_after_s(self) -> float:
+        return self.stale_after_days * 86400
+
+
+class Settings(_Section):
+    subtitles: SubtitleSettings = SubtitleSettings()
+    downloads: DownloadSettings = DownloadSettings()
+
+
+class Secrets(_Section):
+    """`secrets.toml` (mode 0600, next to config.toml): never in config.toml, never sent back."""
+
+    anthropic_api_key: str | None = None
