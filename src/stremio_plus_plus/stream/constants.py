@@ -1,8 +1,10 @@
 # Nominal segment length. Video is copied, so real cuts land on the first keyframe at or after
 # each nominal boundary (ffmpeg segment muxer); EXTINF stays nominal, timestamps stay exact.
 SEGMENT_S = 6.0
-# Every output timestamp is the source's plus this, so the first B-frames never go negative.
-TS_OFFSET_S = 10.0
+# Output timestamps are the source's (ffmpeg shifts the first B-frames' by a frame or two so
+# none go negative). Any offset here shows up on the TV: Stremio draws its own (menu) subtitles
+# against the stream's clock, and a +10 s offset made every one of them 10 s late.
+TS_OFFSET_S = 0.0
 MPEGTS_HZ = 90_000
 # Audio the TV plays inside HLS (Samsung, verified 2026-10-22): passed through untouched.
 # E-AC-3 needs DVB-style signalling (stream type 0x06 + descriptor, ffmpeg `system_b`): with the
